@@ -52,10 +52,17 @@ class App
     # your program code here
     # You can access CLI options via
     # the options Hash
-    tangler = App::Tangler.new("src/lmt.lmd")
-    tangler.backup(output)
-    tangler.tangle()
-    tangler.write(output)
+    begin
+      tangler = App::Tangler.new("src/lmt.lmd")
+      tangler.backup(output)
+      tangler.tangle()
+      tangler.write(output)
+    rescue Exception => e
+      puts "Error: #{e.message} At:"
+      e.backtrace.each do |trace|
+        puts "    #{trace}"
+      end
+    end
   end
 
   class Tangler
@@ -78,6 +85,7 @@ class App
     def tangle()
       @block = read_block()
       expand_macro(@block)
+      @tangled = true
     end
 
     def read_block()

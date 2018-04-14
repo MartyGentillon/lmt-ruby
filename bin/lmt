@@ -1,0 +1,103 @@
+#!/usr/bin/env ruby
+# Encoding: utf-8
+
+require 'optparse'
+require 'methadone'
+require 'lmt.rb'
+require 'fileutils'
+
+class App
+  include Methadone::Main
+  include Methadone::CLILogging
+  def self.output
+    return "bin/lmt"
+  end
+  ## hello world I am a block blocks may have blocks
+
+  main do # Add args you want: |like,so|
+    # your program code here
+    # You can access CLI options via
+    # the options Hash
+    tangler = App::Tangler.new("src/lmt.lmd")
+    tangler.backup(output)
+    tangler.tangle()
+    tangler.write(output)
+  end
+
+  class Tangler
+    def initialize(input)
+      @in_block = false
+      @block = ""
+      @blocks = {
+        "comment" => "hello world I am a block blocks may have blocks",
+        "second" => "blocks may have blocks"
+      }
+      @tangled = false
+      @input = input
+    end
+
+    def backup(output)
+      FileUtils.copy(output, "#{output}.bak")
+      FileUtils.copy(output, "#{output}.bak2")
+    end
+
+    def tangle()
+      @block = read_block()
+      expand_macro(@block)
+    end
+
+    def read_block()
+      fin = File.open(@input, 'r')
+      lines = fin.readlines
+      lines.find_all do |line|
+        b = @in_block
+        @in_block = !@in_block if line =~/^[s]*```/
+        b and @in_block
+      end
+    end
+
+    def expand_macro(lines)
+      macro_exp = /⦅([-\w]*)⦆/
+      lines.map do |line|
+        matches = line.scan(macro_exp).uniq
+        matches.each do |(macro_name)|
+          line.gsub!("⦅#{macro_name}⦆", @blocks[macro_name])
+        end
+        line
+      end
+    end
+
+    def write(output)
+      fout = File.open(output, 'w')
+      tangle() unless @tangled
+      @block.each {|line| fout << line}
+    end
+  end
+
+  # supplemental methods here
+
+  # Declare command-line interface here
+
+  # description "one line description of your app"
+  #
+  # Accept flags via:
+  # on("--flag VAL","Some flag")
+  # options[flag] will contain VAL
+  #
+  # Specify switches via:
+  # on("--[no-]switch","Some switch")
+  #
+  # Or, just call OptionParser methods on opts
+  #
+  # Require an argument
+  # arg :some_arg 
+  #
+  # # Make an argument optional
+  # arg :optional_arg, :optional
+
+  version Lmt::VERSION
+
+  use_log_level_option :toggle_debug_on_signal => 'USR1'
+
+  go! if __FILE__ == $0
+end

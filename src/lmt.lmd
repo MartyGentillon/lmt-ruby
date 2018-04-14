@@ -1,0 +1,138 @@
+# Lmt-Ruby
+
+Lmt is a literate markdown tangle program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
+
+In literate programming, a program is contained within a prose essay describing the thinking which goes into the program.  The source code is then extracted from the essay using a program called tangle (this application).  The essay can also be formatted into a document for human consumption using a program called "weave".
+
+## Why?
+
+While there are other markdown tanglers available (especially [lmt](https://github.com/driusan/lmt), which this program is designed to be superficially similar to) none quite match the combination of simplicity and extensibility which I need.
+
+## Features
+
+In order to be useful for literate programming we need a few features:
+
+1. The ability to strip code out of a markdown file and place it into a tangled file with either a default or specified name.
+2. The ability to embed macros so that the code can be expressed in any order desired.
+3. The ability to apply filters on the contents of a macro
+4. The ability to to identify code blocks which will be expanded when referenced
+5. The ability to append to or replace code blocks
+6. The ability to extend the tangler with Ruby code from a block.
+
+Markdown already supports code blocks expressed with code fences starting with three backticks, usually enabling syntax highlighting on the output.  This works for blocks that contain code.  Markdown also includes an off-left rule for defining block quotes.  This should be sufficient for english text.
+
+In order to add the features we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For block quotes, well <<<TODO>>>.
+
+To append to a block, just open it again.  The macro expansion only happens after the entire file is read.
+
+We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.
+
+## Implementation and Example
+
+Now for an example.  Using Ruby we can start as below:
+
+```ruby
+#!/usr/bin/env ruby
+# Encoding: utf-8
+
+require 'optparse'
+require 'methadone'
+require 'lmt.rb'
+require 'fileutils'
+
+class App
+  include Methadone::Main
+  include Methadone::CLILogging
+  def self.output
+    return "bin/lmt"
+  end
+  ## ⦅comment⦆
+
+  main do # Add args you want: |like,so|
+    # your program code here
+    # You can access CLI options via
+    # the options Hash
+    tangler = App::Tangler.new("src/lmt.lmd")
+    tangler.backup(output)
+    tangler.tangle()
+    tangler.write(output)
+  end
+
+  class Tangler
+    def initialize(input)
+      @in_block = false
+      @block = ""
+      @blocks = {
+        "comment" => "hello world I am a block ⦅second⦆",
+        "second" => "blocks may have blocks"
+      }
+      @tangled = false
+      @input = input
+    end
+
+    def backup(output)
+      FileUtils.copy(output, "#{output}.bak")
+      FileUtils.copy(output, "#{output}.bak2")
+    end
+
+    def tangle()
+      @block = read_block()
+      expand_macro(@block)
+    end
+
+    def read_block()
+      fin = File.open(@input, 'r')
+      lines = fin.readlines
+      lines.find_all do |line|
+        b = @in_block
+        @in_block = !@in_block if line =~/^[s]*```/
+        b and @in_block
+      end
+    end
+
+    def expand_macro(lines)
+      macro_exp = /⦅([-\w]*)⦆/
+      lines.map do |line|
+        matches = line.scan(macro_exp).uniq
+        matches.each do |(macro_name)|
+          line.gsub!("⦅#{macro_name}⦆", @blocks[macro_name])
+        end
+        line
+      end
+    end
+
+    def write(output)
+      fout = File.open(output, 'w')
+      tangle() unless @tangled
+      @block.each {|line| fout << line}
+    end
+  end
+
+  # supplemental methods here
+
+  # Declare command-line interface here
+
+  # description "one line description of your app"
+  #
+  # Accept flags via:
+  # on("--flag VAL","Some flag")
+  # options[flag] will contain VAL
+  #
+  # Specify switches via:
+  # on("--[no-]switch","Some switch")
+  #
+  # Or, just call OptionParser methods on opts
+  #
+  # Require an argument
+  # arg :some_arg 
+  #
+  # # Make an argument optional
+  # arg :optional_arg, :optional
+
+  version Lmt::VERSION
+
+  use_log_level_option :toggle_debug_on_signal => 'USR1'
+
+  go! if __FILE__ == $0
+end
+```

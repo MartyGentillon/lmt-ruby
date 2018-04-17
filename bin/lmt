@@ -12,7 +12,6 @@ class App
   def self.output
     return "bin/lmt"
   end
-  ## hello world I am a block blocks may have blocks
 
   main do # Add args you want: |like,so|
     # your program code here
@@ -35,10 +34,7 @@ class App
     def initialize(input)
       @in_block = false
       @block = ""
-      @blocks = {
-        "comment" => "hello world I am a block blocks may have blocks",
-        "second" => "blocks may have blocks"
-      }
+      @blocks = {}
       @tangled = false
       @input = input
     end
@@ -49,36 +45,57 @@ class App
     end
 
     def tangle()
-      @block = read_block()
-      expand_macro(@block)
+      contents = read_file_lines()
+      @blocks = parse_blocks(contents)
+      expand_macro(@blocks)
       @tangled = true
     end
 
-    def read_block()
-      fin = File.open(@input, 'r')
-      lines = fin.readlines
-      lines.find_all do |line|
-        b = @in_block
-        @in_block = !@in_block if line =~/^[s]*```/
-        b and @in_block
-      end
+    def read_file_lines()
+      #fin = File.open(@input, 'r')
+      fin = File.open("src/lmt.lmd", 'r')
+      last_header = nil
+      fin.readlines
     end
 
-    def expand_macro(lines)
+    def parse_blocks(lines)
+      code_block_exp = /^[s]*``` ?\w* ?([\w]*)?/
+      blocks = lines.find_all do |line|
+        b = @in_block
+        @in_block = !@in_block if line =~ code_block_exp
+        @in_block
+      end.slice_before do |line|
+        code_block_exp =~ line
+      end.map do |(header, *rest)|
+        match = code_block_exp.match(header)
+        [match[1], rest]
+      end.group_by do |(header, body)|
+        header
+      end.transform_values do |bodies|
+        bodies.map { |(_, body)| body}.flatten(1)
+      end
+      blocks
+    end
+
+    def expand_macro(blocks)
       macro_exp = /⦅([-\w]*)⦆/
-      lines.map do |line|
-        matches = line.scan(macro_exp).uniq
-        matches.each do |(macro_name)|
-          line.gsub!("⦅#{macro_name}⦆", @blocks[macro_name])
+      blocks.inject({}) do |h, (key, lines)|
+        h[key] = lines.map do |line|
+          matches = line.scan(macro_exp).uniq
+          matches.each do |(macro_name)|
+            throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
+            line.gsub!("⦅#{macro_name}⦆", @blocks[macro_name])
+          end
+          line
         end
-        line
+        h
       end
     end
 
     def write(output)
       fout = File.open(output, 'w')
       tangle() unless @tangled
-      @block.each {|line| fout << line}
+      @blocks[""].each {|line| fout << line}
     end
   end
 

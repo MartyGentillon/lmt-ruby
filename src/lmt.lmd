@@ -50,36 +50,38 @@ To append to a block, just open it again.  The macro expansion only happens afte
 block_appendment = true
 ```
 
-We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.  To include those symbols, they can be escaped, in which case they will be emitted with the ⦅ and ⦆ intact.  You can see the example from this test of the above description.
+We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside `⦅⦆` refers to a block by name and should be replaced by the contents of that block.  You may place spaces around the name.  To include those symbols, they can be escaped with `\`, in which case they will be emitted with the `⦅` and `⦆` intact.  You can see the example from this test of the above description.
 
 ```ruby test_macro_description
 block_replacement = true
 
-# the macro
+# the macro substitution
 ⦅macro_description⦆
 
-# the checks
+# These require the code in the macro to work.
 report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
 report_self_test_failure("appending to macros doesn't work") unless block_appendment
+
+insertion_works_with_spaces = false
+⦅ insertion_works_with_spaces ⦆
+report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
 ```
+
+For that to work we need:
+
+``` ruby insertion_works_with_spaces
+insertion_works_with_spaces = true
+```
+
+
+
+### Self Test
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
 
 ``` ruby self_test
 def self.self_test()
-  ⦅test_macro_description⦆
-end
-```
-
-And finally, we need basic error handling that will allow a partially working tangler to pass when needed
-
-``` ruby report_self_test_failure
-def self.report_self_test_failure(message)
-  if @dev
-    p message
-  else
-    throw message
-  end
+  ⦅test_description⦆
 end
 ```
 
@@ -274,7 +276,7 @@ This is implemented by splitting the line on the replacement section, grouping i
 def expand_macros(lines, depth = 0)
   throw "too deep macro expansion {depth}" if depth > 1000
   white_space_exp = /^(\s*)(.*\n?)/
-  macro_substitution_exp = /(?<!\\)⦅([-\w]*)⦆/
+  macro_substitution_exp = /(?<!\\)⦅ *([-\w]*) *⦆/
   lines.map do |line|
     white_space, text = white_space_exp.match(line)[1..2]
     section = text.split(macro_substitution_exp)
@@ -327,6 +329,25 @@ end
 ```
 
 ## Self Test, Details
+
+So, now we need to go into details of our self test and also include regressions which have caused problems.
+
+``` ruby test_description
+⦅test_macro_description⦆
+```
+
+And to report our errors:
+
+``` ruby report_self_test_failure
+def self.report_self_test_failure(message)
+  if @dev
+    p message
+  else
+    throw message
+  end
+end
+```
+
 ### Regressions
 
 Some regressions / edge cases that we need to watch for.  These should not break our tangle operation.
@@ -345,6 +366,7 @@ If a block is unused, then don't break if it uses a nonexistent block.
 ``` ruby unused_block
 ⦅this_block_does_not_exist⦆
 ```
+
 ## Fin ┐( ˘_˘)┌
 
 And with that, we have tangled a file.

@@ -27,31 +27,59 @@ Markdown already supports code blocks expressed with code fences starting with t
 
 In order to add the features we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For example
 
-```ruby comment
-# This is a comment
+```ruby macro_description
+# this shouldn't be in the output, it should have been replaced.
+block_replacement = false
 ```
 
 Of course, these do not play well with markdown rendering, so we will need a weaver to display the name appropriately.
 
 To replace a block put `=` before the block name like so:
 
-```ruby =comment
-# this is actually a comment
+```ruby =macro_description
+# this is the replacement
+replaced_block = true
 ```
 
 To append to a block, just open it again.  The macro expansion only happens after the entire file is read.
 
-```ruby comment
-# more comments
+```ruby macro_description
+# Yay appended code gets injected
+block_appendment = true
 ```
 
-We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.  To include those symbols, they can be escaped, in which case they will be emitted with the ⦅ and ⦆ intact.
+We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.  To include those symbols, they can be escaped, in which case they will be emitted with the ⦅ and ⦆ intact.  You can see the example from this test of the above description.
 
-```ruby comment 
-# The contents of this shouldn't be replaced \⦅test\⦆
+```ruby test_macro_description
+block_replacement = true
+
+# the macro
+⦅macro_description⦆
+
+# the checks
+report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
+report_self_test_failure("appending to macros doesn't work") unless block_appendment
 ```
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
+
+``` ruby self_test
+def self.self_test()
+  ⦅test_macro_description⦆
+end
+```
+
+And finally, we need basic error handling that will allow a partially working tangler to pass when needed
+
+``` ruby report_self_test_failure
+def self.report_self_test_failure(message)
+  if @dev
+    p message
+  else
+    throw message
+  end
+end
+```
 
 ## Interface
 
@@ -60,6 +88,7 @@ We need to know where to get the input from and where to send the output to.  Fo
 ``` ruby options
 on("--file FILE", "-f", "input file")
 on("--output FILE", "-o", "output file")
+on("--dev", "disables self test failure for development")
 ```
 
 Of which, both are required
@@ -84,7 +113,7 @@ class App
   include Methadone::Main
   include Methadone::CLILogging
 
-  ⦅comment⦆
+  @dev = true
 
   main do
     begin
@@ -96,6 +125,10 @@ class App
       end
     end
   end
+
+  ⦅self_test⦆
+
+  ⦅report_self_test_failure⦆
 
   ⦅tangle_class⦆
 
@@ -113,9 +146,10 @@ end
 
 This is a basic template using the [Ruby methadone](https://github.com/davetron5000/methadone) command line application framework and making sure that we report errors (because silent failure sucks).
 
-The main body will invoke the library component, which isn't in lib as traditional because it is in this file and I don't want to move it around.
+The main body will first test itself then, invoke the library component, which isn't in lib as traditional because it is in this file and I don't want to move it around.
 
 ``` ruby main_body
+self_test()
 tangler = App::Tangler.new("src/lmt.lmd")
 tangler.tangle()
 tangler.write("bin/lmt")
@@ -136,7 +170,6 @@ The tangler is defined within a class that contains the tangling implementation.
 
 ``` ruby tangle_class
 class Tangler
-
   ⦅initializer⦆
   ⦅tangle⦆
   ⦅read_file⦆
@@ -144,7 +177,6 @@ class Tangler
   ⦅expand_macros⦆
   ⦅unescape_double_parens⦆
   ⦅write⦆
-
 end
 ```
 
@@ -159,6 +191,7 @@ def initialize(input)
   @blocks = {}
   @tangled = false
 end
+
 ```
 
 ### Tangle
@@ -173,6 +206,7 @@ def tangle()
   @block = unescape_double_parens(@block)
   @tangled = true
 end
+
 ```
 
 ### Reading The File
@@ -186,6 +220,7 @@ def read_file()
   last_header = nil
   fin.readlines
 end
+
 ```
 
 ### Parsing The Blocks
@@ -194,11 +229,13 @@ Now we get to the meat of the algorithm.  As our specification is a regular lang
 
 We then filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks (right now, that means ignoring the reset.)
 
+We also need to remove the last newline from the block as it causes problems when injecting a block onto a line with stuff after the end.
+
 Finally, (after making sure we aren't missing a code fence) we extract the unnamed block from the hash and return both it and the rest.
 
 ``` ruby parse_blocks
 def parse_blocks(lines)
-  code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
+  code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
   in_block = false
   blocks = lines.find_all do |line|
     in_block = !in_block if line =~ code_block_exp
@@ -207,17 +244,22 @@ def parse_blocks(lines)
     code_block_exp =~ line
   end.map do |(header, *rest)|
     match = code_block_exp.match(header)
-    [match[2], rest]
+    [match[3], rest]
   end.group_by do |(header, body)|
     header
   end.transform_values do |bodies|
-    bodies.map { |(_, body)| body}.flatten(1)
+    bodies.map { |(_, body)| body}
+      .flatten(1)
+  end.transform_values do |body_lines|
+    body_lines[-1] = body_lines[-1].chomp
+    body_lines
   end
   throw "Missing code fence" if in_block
   main = blocks[""]
   blocks.delete("")
   [main, blocks]
 end
+
 ```
 
 ### Handling the macros
@@ -251,6 +293,7 @@ def expand_macros(lines, depth = 0)
       end
   end.flatten(1)
 end
+
 ```
 
 ### Unescaping Double Parentheses
@@ -265,6 +308,7 @@ def unescape_double_parens(block)
     l
   end
 end
+
 ```
 
 ### Write The Output
@@ -277,6 +321,7 @@ def write(output)
   tangle() unless @tangled
   @block.each {|line| fout << line}
 end
+
 ```
 
 ## Fin ┐( ˘_˘)┌
@@ -284,5 +329,7 @@ end
 And with that, we have tangled a file.
 
 At current, there are a few more features that we need to deal with.  First, when combining declarations for a single block, we need to support replacement.  Second, we have yet to add the idea of filters.  Thirdly, this does not yet support extension by commands.  These features can wait for now.
+
+Moreover, there are a couple development props which need to be removed, and the arguments need to be wired in.
 
 ∎

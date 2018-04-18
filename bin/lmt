@@ -4,23 +4,18 @@
 require 'optparse'
 require 'methadone'
 
-
 class App
   include Methadone::Main
   include Methadone::CLILogging
 
-  # This is a comment
-  # this is actually a comment
-  # more comments
-  # The contents of this shouldn't be replaced ⦅test⦆
-
+  @dev = true
 
   main do
     begin
+      self_test()
       tangler = App::Tangler.new("src/lmt.lmd")
       tangler.tangle()
       tangler.write("bin/lmt")
-
     rescue Exception => e
       puts "Error: #{e.message} At:"
       e.backtrace.each do |trace|
@@ -29,15 +24,38 @@ class App
     end
   end
 
+  def self.self_test()
+    block_replacement = true
+    
+    # the macro
+    # this shouldn't be in the output, it should have been replaced.
+    block_replacement = false
+    # this is the replacement
+    replaced_block = true
+    # Yay appended code gets injected
+    block_appendment = true
+    # the checks
+    
+    report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
+    report_self_test_failure("appending to macros doesn't work") unless block_appendment
+  end
+
+  def self.report_self_test_failure(message)
+    if @dev
+      p message
+    else
+      throw message
+    end
+  end
+
   class Tangler
-  
     def initialize(input)
       @input = input
       @block = ""
       @blocks = {}
       @tangled = false
     end
-
+    
     def tangle()
       contents = read_file()
       @block, @blocks = parse_blocks(contents)
@@ -45,16 +63,16 @@ class App
       @block = unescape_double_parens(@block)
       @tangled = true
     end
-
+    
     def read_file()
       #fin = File.open(@input, 'r')
       fin = File.open("src/lmt.lmd", 'r')
       last_header = nil
       fin.readlines
     end
-
+    
     def parse_blocks(lines)
-      code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
+      code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
       in_block = false
       blocks = lines.find_all do |line|
         in_block = !in_block if line =~ code_block_exp
@@ -63,18 +81,22 @@ class App
         code_block_exp =~ line
       end.map do |(header, *rest)|
         match = code_block_exp.match(header)
-        [match[2], rest]
+        [match[3], rest]
       end.group_by do |(header, body)|
         header
       end.transform_values do |bodies|
-        bodies.map { |(_, body)| body}.flatten(1)
+        bodies.map { |(_, body)| body}
+          .flatten(1)
+      end.transform_values do |body_lines|
+        body_lines[-1] = body_lines[-1].chomp
+        body_lines
       end
       throw "Missing code fence" if in_block
       main = blocks[""]
       blocks.delete("")
       [main, blocks]
     end
-
+    
     def expand_macros(lines, depth = 0)
       throw "too deep macro expansion {depth}" if depth > 1000
       white_space_exp = /^(\s*)(.*\n?)/
@@ -99,7 +121,7 @@ class App
           end
       end.flatten(1)
     end
-
+    
     def unescape_double_parens(block)
       block.map do |l|
         l = l.gsub("\\⦅", "⦅")
@@ -107,25 +129,22 @@ class App
         l
       end
     end
-
+    
     def write(output)
       fout = File.open(output, 'w')
       tangle() unless @tangled
       @block.each {|line| fout << line}
     end
-
-  
+    
   end
 
-
-  description "A literate markdown tangle tool written in Ruby.
-"
+  description "A literate markdown tangle tool written in Ruby."
   on("--file FILE", "-f", "input file")
   on("--output FILE", "-o", "output file")
+  on("--dev", "disables self test failure for development")
   # TODO: required arguments
   #arg :file
   #arg :output
-
 
   version Lmt::VERSION
 
@@ -133,4 +152,3 @@ class App
 
   go! if __FILE__ == $0
 end
-

@@ -75,6 +75,28 @@ Finally, if substitution isn't desired, you may escape the `⦅` and `⦆` with 
 escaped_string = '\⦅macro_description\⦆'
 ```
 
+### Filters
+
+Filters can be defined as functions which take an array of lines and return the altered array.  They are applied after a macro's contents are expanded and before it is inserted.  They are triggered with the `|` symbol in expansion. for example: given
+
+``` text string_with_backslash
+this string ends in \.
+```
+
+The following will escape the `\`
+
+``` ruby filter_use_description
+string_with_backslash = "⦅string_with_backslash | ruby_escape⦆"
+```
+
+There are a few built in filters:
+
+``` ruby filter_class
+class Filters
+  ⦅ruby_escape⦆
+end
+```
+
 ### Self Test
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
@@ -187,6 +209,7 @@ class Tangler
   ⦅read_file⦆
   ⦅parse_blocks⦆
   ⦅expand_macros⦆
+  ⦅apply_filters⦆
   ⦅unescape_double_parens⦆
   ⦅write⦆
 end
@@ -257,8 +280,8 @@ def parse_blocks(lines)
   end.map do |(header, *rest)|
     match = code_block_exp.match(header)
     [match[3], rest]
-  end.group_by do |(header, body)|
-    header
+  end.group_by do |(name, body)|
+    name
   end.transform_values do |bodies|
     bodies.map { |(_, body)| body}
       .flatten(1)
@@ -284,19 +307,28 @@ This is implemented by splitting the line on the replacement section, grouping i
 def expand_macros(lines, depth = 0)
   throw "too deep macro expansion {depth}" if depth > 1000
   white_space_exp = /^(\s*)(.*\n?)/
-  macro_substitution_exp = /(?<!\\)⦅ *([-\w]*) *⦆/
+  macro_substitution_exp = /(?<!\\)⦅ *([-\w | ]*) *⦆/
+  filter_extraction_exp = / *\| *([-\w]+) */
   lines.map do |line|
     begin
       white_space, text = white_space_exp.match(line)[1..2]
       section = text.split(macro_substitution_exp)
           .each_slice(2)
-          .inject([white_space]) do
-            |(*new_lines, last_line), (before, macro_name)|
+          .map do |(before, macro_match)|
+            if (macro_match)
+              macro_name, *filters = macro_match.strip.split(filter_extraction_exp)
+              [before, macro_name, filters.each_slice(2).map(&:first)]
+            else
+              [before]
+            end
+          end.inject([white_space]) do
+            |(*new_lines, last_line), (before, macro_name, filters)|
             if macro_name.nil?
               new_lines << last_line + before
             else
-              throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-              macro_lines = expand_macros(@blocks[macro_name], depth + 1)
+              throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
+              macro_lines = apply_filters(
+                  expand_macros(@blocks[macro_name], depth + 1), filters)
               new_line = last_line + before + macro_lines[0]
               macro_continued = macro_lines[1..-1].map do |macro_line|
                 white_space + macro_line
@@ -340,12 +372,26 @@ end
 
 ```
 
+## The Filters
+
+Filters are applied by the following method:
+
+``` ruby apply_filters
+def apply_filters(strings, filters)
+  strings
+end
+```
+
+``` ruby ruby_escape
+```
+
 ## Self Test, Details
 
 So, now we need to go into details of our self test and also include regressions which have caused problems.
 
 ``` ruby test_description
 ⦅test_macro_insertion_description⦆
+⦅test_filters⦆
 ```
 
 And to report our errors:
@@ -370,13 +416,20 @@ At [the top of the file](#Macros), we described the macros.  Lets make sure that
 report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
 report_self_test_failure("appending to macros doesn't work") unless block_appendment
 report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
-report_self_test_failure("double parenthesees may be escaped") unless escaped_string[0] != '\\'
+report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
 ```
 
 For that to work we need:
 
 ``` ruby insertion_works_with_spaces
 insertion_works_with_spaces = true
+```
+
+### Testing: Filters
+
+``` ruby test_filters
+⦅filter_use_description⦆
+report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\/
 ```
 
 ### Regressions

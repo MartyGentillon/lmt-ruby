@@ -50,7 +50,9 @@ class App
     report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
     report_self_test_failure("appending to macros doesn't work") unless block_appendment
     report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
-    report_self_test_failure("double parenthesees may be escaped") unless escaped_string[0] != '\\'
+    report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
+    string_with_backslash = "this string ends in \."
+    report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
   end
 
   def self.report_self_test_failure(message)
@@ -95,8 +97,8 @@ class App
       end.map do |(header, *rest)|
         match = code_block_exp.match(header)
         [match[3], rest]
-      end.group_by do |(header, body)|
-        header
+      end.group_by do |(name, body)|
+        name
       end.transform_values do |bodies|
         bodies.map { |(_, body)| body}
           .flatten(1)
@@ -113,19 +115,28 @@ class App
     def expand_macros(lines, depth = 0)
       throw "too deep macro expansion {depth}" if depth > 1000
       white_space_exp = /^(\s*)(.*\n?)/
-      macro_substitution_exp = /(?<!\\)⦅ *([-\w]*) *⦆/
+      macro_substitution_exp = /(?<!\\)⦅ *([-\w | ]*) *⦆/
+      filter_extraction_exp = / *\| *([-\w]+) */
       lines.map do |line|
         begin
           white_space, text = white_space_exp.match(line)[1..2]
           section = text.split(macro_substitution_exp)
               .each_slice(2)
-              .inject([white_space]) do
-                |(*new_lines, last_line), (before, macro_name)|
+              .map do |(before, macro_match)|
+                if (macro_match)
+                  macro_name, *filters = macro_match.strip.split(filter_extraction_exp)
+                  [before, macro_name, filters.each_slice(2).map(&:first)]
+                else
+                  [before]
+                end
+              end.inject([white_space]) do
+                |(*new_lines, last_line), (before, macro_name, filters)|
                 if macro_name.nil?
                   new_lines << last_line + before
                 else
-                  throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-                  macro_lines = expand_macros(@blocks[macro_name], depth + 1)
+                  throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
+                  macro_lines = apply_filters(
+                      expand_macros(@blocks[macro_name], depth + 1), filters)
                   new_line = last_line + before + macro_lines[0]
                   macro_continued = macro_lines[1..-1].map do |macro_line|
                     white_space + macro_line
@@ -139,6 +150,9 @@ class App
       end.flatten(1)
     end
     
+    def apply_filters(strings, filters)
+      strings
+    end
     def unescape_double_parens(block)
       block.map do |l|
         l = l.gsub("\\⦅", "⦅")

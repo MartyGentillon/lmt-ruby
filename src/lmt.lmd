@@ -50,30 +50,30 @@ To append to a block, just open it again.  The macro expansion only happens afte
 block_appendment = true
 ```
 
-We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside `⦅⦆` refers to a block by name and should be replaced by the contents of that block.  You may place spaces around the name.  To include those symbols, they can be escaped with `\`, in which case they will be emitted with the `⦅` and `⦆` intact.  You can see the example from this test of the above description.
+We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside `⦅⦆` refers to a block by name and should be replaced by the contents of that block.
 
-```ruby test_macro_description
+```ruby macro_insertion_description
 block_replacement = true
+replaced_block = false
+block_appendment = false
 
-# the macro substitution
 ⦅macro_description⦆
+```
 
-# These require the code in the macro to work.
-report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
-report_self_test_failure("appending to macros doesn't work") unless block_appendment
+Given the definition of `macro_description` above, all the variables will be true at the end of that block.
 
+This also works with spaces inside the `⦅⦆`
+
+``` ruby macro_insertion_description
 insertion_works_with_spaces = false
 ⦅ insertion_works_with_spaces ⦆
-report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
 ```
 
-For that to work we need:
+Finally, if substitution isn't desired, you may escape the `⦅` and `⦆` with `\` which will prevent macro expansion.  As below; the first character of escaped string is `⦅`
 
-``` ruby insertion_works_with_spaces
-insertion_works_with_spaces = true
+``` ruby macro_insertion_description
+escaped_string = '\⦅macro_description\⦆'
 ```
-
-
 
 ### Self Test
 
@@ -333,7 +333,7 @@ end
 So, now we need to go into details of our self test and also include regressions which have caused problems.
 
 ``` ruby test_description
-⦅test_macro_description⦆
+⦅test_macro_insertion_description⦆
 ```
 
 And to report our errors:
@@ -346,6 +346,25 @@ def self.report_self_test_failure(message)
     throw message
   end
 end
+```
+
+### Testing: Macros
+
+At [the top of the file](#Macros), we described the macros.  Lets make sure that works by ensuring the variables are as they were described above
+
+``` ruby test_macro_insertion_description
+⦅macro_insertion_description⦆
+# These require the code in the macro to work.
+report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
+report_self_test_failure("appending to macros doesn't work") unless block_appendment
+report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
+report_self_test_failure("double parenthesees may be escaped") unless escaped_string[0] != '\\'
+```
+
+For that to work we need:
+
+``` ruby insertion_works_with_spaces
+insertion_works_with_spaces = true
 ```
 
 ### Regressions

@@ -262,7 +262,7 @@ end
 
 Now we get to the meat of the algorithm.  As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  The first expression is intended to note when whe enter or leave a code block.
 
-We then filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks (right now, that means ignoring the reset.)
+We then filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks which follow the last reset for that block name.
 
 We also need to remove the last newline from the block as it causes problems when injecting a block onto a line with stuff after the end.
 
@@ -278,12 +278,21 @@ def parse_blocks(lines)
   end.slice_before do |line|
     code_block_exp =~ line
   end.map do |(header, *rest)|
-    match = code_block_exp.match(header)
-    [match[3], rest]
-  end.group_by do |(name, body)|
+    white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
+    [name, replacement_mark, rest]
+  end.group_by do |(name, _)|
     name
   end.transform_values do |bodies|
-    bodies.map { |(_, body)| body}
+    last_replacement = bodies.each_with_index
+        .select do |((_, replacement_mark, _), _)|
+          replacement_mark == '='
+        end[-1]
+    last_replacement_index = if last_replacement
+          last_replacement[1]
+        else
+          0
+        end
+    bodies[last_replacement_index..-1].map { |(_, replacement_mark, body)| body}
       .flatten(1)
   end.transform_values do |body_lines|
     body_lines[-1] = body_lines[-1].chomp if body_lines[-1]
@@ -427,9 +436,11 @@ insertion_works_with_spaces = true
 
 ### Testing: Filters
 
+At the [top of the file](Filters) we described the usage of filters.  Let's make sure that works.  The extra `.?` in the regular expression is a workaround for an editor bug in Visual Studio Code, where, apparently, `/\\/` escapes the `/` rather than the `\`.... annoying.
+
 ``` ruby test_filters
 ⦅filter_use_description⦆
-report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\/
+report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
 ```
 
 ### Regressions

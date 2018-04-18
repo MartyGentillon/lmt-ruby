@@ -37,8 +37,6 @@ class App
     replaced_block = false
     block_appendment = false
     
-    # this shouldn't be in the output, it should have been replaced.
-    block_replacement = false
     # this is the replacement
     replaced_block = true
     # Yay appended code gets injected
@@ -95,12 +93,21 @@ class App
       end.slice_before do |line|
         code_block_exp =~ line
       end.map do |(header, *rest)|
-        match = code_block_exp.match(header)
-        [match[3], rest]
-      end.group_by do |(name, body)|
+        white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
+        [name, replacement_mark, rest]
+      end.group_by do |(name, _)|
         name
       end.transform_values do |bodies|
-        bodies.map { |(_, body)| body}
+        last_replacement = bodies.each_with_index
+            .select do |((_, replacement_mark, _), _)|
+              replacement_mark == '='
+            end[-1]
+        last_replacement_index = if last_replacement
+              last_replacement[1]
+            else
+              0
+            end
+        bodies[last_replacement_index..-1].map { |(_, replacement_mark, body)| body}
           .flatten(1)
       end.transform_values do |body_lines|
         body_lines[-1] = body_lines[-1].chomp if body_lines[-1]

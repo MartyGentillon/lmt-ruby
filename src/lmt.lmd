@@ -1,7 +1,7 @@
 # Lmt-Ruby
 
 ``` text description
-A literate markdown tangle tool written in Ruby
+A literate markdown tangle tool written in Ruby.
 ```
 
 Lmt is a literate markdown tangle program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
@@ -23,15 +23,13 @@ In order to be useful for literate programming we need a few features:
 5. The ability to append to or replace code blocks
 6. The ability to extend the tangler with Ruby code from a block.
 
-Markdown already supports code blocks expressed with code fences starting with three backticks, usually enabling syntax highlighting on the output.  This works for blocks that contain code.  Markdown also includes an off-left rule for defining block quotes.  This should be sufficient for english text.
+Markdown already supports code blocks expressed with code fences starting with three backticks, usually enabling syntax highlighting on the output.  This should work excellently for identifying block boundaries.
 
 In order to add the features we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For example
 
 ```ruby comment
 # This is a comment
 ```
-
-For block quotes, well <<<TODO>>>.
 
 Of course, these do not play well with markdown rendering, so we will need a weaver to display the name appropriately.
 
@@ -50,7 +48,7 @@ To append to a block, just open it again.  The macro expansion only happens afte
 We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.  To include those symbols, they can be escaped, in which case they will be emitted with the ⦅ and ⦆ intact.
 
 ```ruby comment 
-# \⦅should be unaltered\⦆
+# The contents of this shouldn't be replaced \⦅test\⦆
 ```
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
@@ -115,6 +113,7 @@ end
 
 This is a basic template using the [Ruby methadone](https://github.com/davetron5000/methadone) command line application framework and making sure that we report errors (because silent failure sucks).
 
+The main body will invoke the library component, which isn't in lib as traditional because it is in this file and I don't want to move it around.
 
 ``` ruby main_body
 tangler = App::Tangler.new("src/lmt.lmd")
@@ -122,95 +121,168 @@ tangler.tangle()
 tangler.write("bin/lmt")
 ```
 
+Finally, we have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.
+
 ``` ruby includes
 require 'optparse'
 require 'methadone'
-require 'lmt.rb'
-require 'fileutils'
 ```
+
+There, now we are done with the boilerplate. On to:
+
+## The Actual Tangler
+
+The tangler is defined within a class that contains the tangling implementation.  It contains the following blocks
 
 ``` ruby tangle_class
 class Tangler
-  def initialize(input)
-    @block = ""
-    @blocks = {}
-    @tangled = false
-    @input = input
-  end
 
-  def tangle()
-    contents = read_file_lines()
-    @block, @blocks = parse_blocks(contents)
-    @block = expand_macros(@block)
-    @block = handle_escapes(@block)
-    @tangled = true
-  end
+  ⦅initializer⦆
+  ⦅tangle⦆
+  ⦅read_file⦆
+  ⦅parse_blocks⦆
+  ⦅expand_macros⦆
+  ⦅unescape_double_parens⦆
+  ⦅write⦆
 
-  def read_file_lines()
-    #fin = File.open(@input, 'r')
-    fin = File.open("src/lmt.lmd", 'r')
-    last_header = nil
-    fin.readlines
-  end
+end
+```
 
-  def parse_blocks(lines)
-    code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
-    in_block = false
-    blocks = lines.find_all do |line|
-      in_block = !in_block if line =~ code_block_exp
-      in_block
-    end.slice_before do |line|
-      code_block_exp =~ line
-    end.map do |(header, *rest)|
-      match = code_block_exp.match(header)
-      [match[2], rest]
-    end.group_by do |(header, body)|
-      header
-    end.transform_values do |bodies|
-      bodies.map { |(_, body)| body}.flatten(1)
-    end
-    main = blocks[""]
-    blocks.delete("")
-    [main, blocks]
-  end
+### Initializer
 
-  def expand_macros(lines, depth = 0)
-    throw "too deep macro expansion {depth}" if depth > 1000
-    white_space_exp = /^(\s*)(.*\n?)/
-    macro_substitution_exp = /⦅([-\w]*)⦆/
-    lines.map do |line|
-      white_space, text = white_space_exp.match(line)[1..2]
-      section = text.split(macro_substitution_exp)
-        .each_slice(2)
-        .inject([white_space]) do
-          |(*new_lines, last_line), (before, macro_name)|
-          if macro_name.nil?
-            new_lines << last_line + before
-          else
-            throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-            macro_lines = expand_macros(@blocks[macro_name], depth + 1)
-            new_line = last_line + before + macro_lines[0]
-            macro_continued = macro_lines[1..-1].map do |macro_line|
-              white_space + macro_line
-            end
-            (new_lines << new_line) + macro_continued
+The initializer takes in the input file and sets up our state.  We are keeping the unnamed top level block separate from the rest.  Then we have a hash of blocks.  Finally, we need to make sure we have tangled before we write the output.
+
+``` ruby initializer
+def initialize(input)
+  @input = input
+  @block = ""
+  @blocks = {}
+  @tangled = false
+end
+```
+
+### Tangle
+
+Now we have the basic tangle process wherein a file is read, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.
+
+``` ruby tangle
+def tangle()
+  contents = read_file()
+  @block, @blocks = parse_blocks(contents)
+  @block = expand_macros(@block)
+  @block = unescape_double_parens(@block)
+  @tangled = true
+end
+```
+
+### Reading The File
+
+This is fairly self explanatory, though note, we are storing the file in memory as an array of lines.
+
+``` ruby read_file
+def read_file()
+  #fin = File.open(@input, 'r')
+  fin = File.open("src/lmt.lmd", 'r')
+  last_header = nil
+  fin.readlines
+end
+```
+
+### Parsing The Blocks
+
+Now we get to the meat of the algorithm.  As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  The first expression is intended to note when whe enter or leave a code block.
+
+We then filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks (right now, that means ignoring the reset.)
+
+Finally, (after making sure we aren't missing a code fence) we extract the unnamed block from the hash and return both it and the rest.
+
+``` ruby parse_blocks
+def parse_blocks(lines)
+  code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
+  in_block = false
+  blocks = lines.find_all do |line|
+    in_block = !in_block if line =~ code_block_exp
+    in_block
+  end.slice_before do |line|
+    code_block_exp =~ line
+  end.map do |(header, *rest)|
+    match = code_block_exp.match(header)
+    [match[2], rest]
+  end.group_by do |(header, body)|
+    header
+  end.transform_values do |bodies|
+    bodies.map { |(_, body)| body}.flatten(1)
+  end
+  throw "Missing code fence" if in_block
+  main = blocks[""]
+  blocks.delete("")
+  [main, blocks]
+end
+```
+
+### Handling the macros
+
+The other half of the meat.  Here we use two regular expressions.  One to identify and propagate whitespace and the other to actually find the replacements in a line.
+
+This is implemented by splitting the line on the replacement section, grouping into pairs, and then reducing.  Afterwords, we end up with an extra layer of lists which need to be flatened.  (Yes I am using a monad and bind.)
+
+``` ruby expand_macros
+def expand_macros(lines, depth = 0)
+  throw "too deep macro expansion {depth}" if depth > 1000
+  white_space_exp = /^(\s*)(.*\n?)/
+  macro_substitution_exp = /(?<!\\)⦅([-\w]*)⦆/
+  lines.map do |line|
+    white_space, text = white_space_exp.match(line)[1..2]
+    section = text.split(macro_substitution_exp)
+      .each_slice(2)
+      .inject([white_space]) do
+        |(*new_lines, last_line), (before, macro_name)|
+        if macro_name.nil?
+          new_lines << last_line + before
+        else
+          throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
+          macro_lines = expand_macros(@blocks[macro_name], depth + 1)
+          new_line = last_line + before + macro_lines[0]
+          macro_continued = macro_lines[1..-1].map do |macro_line|
+            white_space + macro_line
           end
+          (new_lines << new_line) + macro_continued
         end
-    end.flatten(1)
-  end
+      end
+  end.flatten(1)
+end
+```
 
-  def handle_escapes(block)
-    block.map do |l|
-      l = l.gsub("\\\⦅", "⦅")
-      l = l.gsub("\\\⦆", "⦆")
-      l
-    end
-  end
+### Unescaping Double Parentheses
 
-  def write(output)
-    fout = File.open(output, 'w')
-    tangle() unless @tangled
-    @block.each {|line| fout << line}
+This is fairly self explanatory, gsub is global substitution.  We need three `\`s two to match the escape sequence for `\` in ruby and a third to handle the escaped `⦅` and `⦆` when this file itself is tangled.
+
+``` ruby unescape_double_parens
+def unescape_double_parens(block)
+  block.map do |l|
+    l = l.gsub("\\\⦅", "⦅")
+    l = l.gsub("\\\⦆", "⦆")
+    l
   end
 end
 ```
+
+### Write The Output
+
+Finally, write the output.
+
+``` ruby write
+def write(output)
+  fout = File.open(output, 'w')
+  tangle() unless @tangled
+  @block.each {|line| fout << line}
+end
+```
+
+## Fin ┐( ˘_˘)┌
+
+And with that, we have tangled a file.
+
+At current, there are a few more features that we need to deal with.  First, when combining declarations for a single block, we need to support replacement.  Second, we have yet to add the idea of filters.  Thirdly, this does not yet support extension by commands.  These features can wait for now.
+
+∎

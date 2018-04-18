@@ -3,8 +3,6 @@
 
 require 'optparse'
 require 'methadone'
-require 'lmt.rb'
-require 'fileutils'
 
 
 class App
@@ -14,7 +12,7 @@ class App
   # This is a comment
   # this is actually a comment
   # more comments
-  # ⦅should be unaltered⦆
+  # The contents of this shouldn't be replaced ⦅test⦆
 
 
   main do
@@ -32,28 +30,29 @@ class App
   end
 
   class Tangler
+  
     def initialize(input)
+      @input = input
       @block = ""
       @blocks = {}
       @tangled = false
-      @input = input
     end
-  
+
     def tangle()
-      contents = read_file_lines()
+      contents = read_file()
       @block, @blocks = parse_blocks(contents)
       @block = expand_macros(@block)
-      @block = handle_escapes(@block)
+      @block = unescape_double_parens(@block)
       @tangled = true
     end
-  
-    def read_file_lines()
+
+    def read_file()
       #fin = File.open(@input, 'r')
       fin = File.open("src/lmt.lmd", 'r')
       last_header = nil
       fin.readlines
     end
-  
+
     def parse_blocks(lines)
       code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
       in_block = false
@@ -70,15 +69,16 @@ class App
       end.transform_values do |bodies|
         bodies.map { |(_, body)| body}.flatten(1)
       end
+      throw "Missing code fence" if in_block
       main = blocks[""]
       blocks.delete("")
       [main, blocks]
     end
-  
+
     def expand_macros(lines, depth = 0)
       throw "too deep macro expansion {depth}" if depth > 1000
       white_space_exp = /^(\s*)(.*\n?)/
-      macro_substitution_exp = /⦅([-\w]*)⦆/
+      macro_substitution_exp = /(?<!\\)⦅([-\w]*)⦆/
       lines.map do |line|
         white_space, text = white_space_exp.match(line)[1..2]
         section = text.split(macro_substitution_exp)
@@ -99,24 +99,26 @@ class App
           end
       end.flatten(1)
     end
-  
-    def handle_escapes(block)
+
+    def unescape_double_parens(block)
       block.map do |l|
         l = l.gsub("\\⦅", "⦅")
         l = l.gsub("\\⦆", "⦆")
         l
       end
     end
-  
+
     def write(output)
       fout = File.open(output, 'w')
       tangle() unless @tangled
       @block.each {|line| fout << line}
     end
+
+  
   end
 
 
-  description "A literate markdown tangle tool written in Ruby
+  description "A literate markdown tangle tool written in Ruby.
 "
   on("--file FILE", "-f", "input file")
   on("--output FILE", "-o", "output file")

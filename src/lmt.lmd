@@ -123,10 +123,18 @@ class App
     begin
       ⦅main_body⦆
     rescue Exception => e
-      puts "Error: #{e.message} At:"
+      puts "Error: #{e.message} #{extract_causes(e)}At:"
       e.backtrace.each do |trace|
         puts "    #{trace}"
       end
+    end
+  end
+
+  def self.extract_causes(error)
+    if (error.cause)
+      "  Caused by: #{error.cause.message}\n#{extract_causes(error.cause)}"
+    else
+      ""
     end
   end
 
@@ -270,7 +278,7 @@ end
 
 The other half of the meat.  Here we use two regular expressions.  One to identify and propagate whitespace and the other to actually find the replacements in a line.
 
-This is implemented by splitting the line on the replacement section, grouping into pairs, and then reducing.  Afterwords, we end up with an extra layer of lists which need to be flatened.  (Yes I am using a monad and bind.)
+This is implemented by splitting the line on the replacement section, grouping into pairs, and then reducing.  Afterwords, we end up with an extra layer of lists which need to be flattened.  (Yes I am using a monad and bind.)
 
 ``` ruby expand_macros
 def expand_macros(lines, depth = 0)
@@ -278,23 +286,27 @@ def expand_macros(lines, depth = 0)
   white_space_exp = /^(\s*)(.*\n?)/
   macro_substitution_exp = /(?<!\\)⦅ *([-\w]*) *⦆/
   lines.map do |line|
-    white_space, text = white_space_exp.match(line)[1..2]
-    section = text.split(macro_substitution_exp)
-      .each_slice(2)
-      .inject([white_space]) do
-        |(*new_lines, last_line), (before, macro_name)|
-        if macro_name.nil?
-          new_lines << last_line + before
-        else
-          throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-          macro_lines = expand_macros(@blocks[macro_name], depth + 1)
-          new_line = last_line + before + macro_lines[0]
-          macro_continued = macro_lines[1..-1].map do |macro_line|
-            white_space + macro_line
+    begin
+      white_space, text = white_space_exp.match(line)[1..2]
+      section = text.split(macro_substitution_exp)
+          .each_slice(2)
+          .inject([white_space]) do
+            |(*new_lines, last_line), (before, macro_name)|
+            if macro_name.nil?
+              new_lines << last_line + before
+            else
+              throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
+              macro_lines = expand_macros(@blocks[macro_name], depth + 1)
+              new_line = last_line + before + macro_lines[0]
+              macro_continued = macro_lines[1..-1].map do |macro_line|
+                white_space + macro_line
+              end
+              (new_lines << new_line) + macro_continued
+            end
           end
-          (new_lines << new_line) + macro_continued
-        end
-      end
+    rescue Exception => e
+      raise "Failed to process line: #{line}"
+    end
   end.flatten(1)
 end
 

@@ -6,12 +6,15 @@ require 'methadone'
 require 'lmt.rb'
 require 'fileutils'
 
+
 class App
   include Methadone::Main
   include Methadone::CLILogging
-  def self.output
-    return "bin/lmt"
-  end
+
+  #  This is a comment
+  # this is actually a comment
+  # more comments
+
 
   main do # Add args you want: |like,so|
     # your program code here
@@ -19,9 +22,9 @@ class App
     # the options Hash
     begin
       tangler = App::Tangler.new("src/lmt.lmd")
-      tangler.backup(output)
       tangler.tangle()
-      tangler.write(output)
+      tangler.write("bin/lmt")
+
     rescue Exception => e
       puts "Error: #{e.message} At:"
       e.backtrace.each do |trace|
@@ -38,28 +41,23 @@ class App
       @tangled = false
       @input = input
     end
-
-    def backup(output)
-      FileUtils.copy(output, "#{output}.bak")
-      FileUtils.copy(output, "#{output}.bak2")
-    end
-
+  
     def tangle()
       contents = read_file_lines()
-      @blocks = parse_blocks(contents)
-      expand_macro(@blocks)
+      @block, @blocks = parse_blocks(contents)
+      @block = expand_macro(@block)
       @tangled = true
     end
-
+  
     def read_file_lines()
       #fin = File.open(@input, 'r')
       fin = File.open("src/lmt.lmd", 'r')
       last_header = nil
       fin.readlines
     end
-
+  
     def parse_blocks(lines)
-      code_block_exp = /^[s]*``` ?\w* ?([\w]*)?/
+      code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
       blocks = lines.find_all do |line|
         b = @in_block
         @in_block = !@in_block if line =~ code_block_exp
@@ -68,36 +66,49 @@ class App
         code_block_exp =~ line
       end.map do |(header, *rest)|
         match = code_block_exp.match(header)
-        [match[1], rest]
+        [match[2], rest]
       end.group_by do |(header, body)|
         header
       end.transform_values do |bodies|
         bodies.map { |(_, body)| body}.flatten(1)
       end
-      blocks
+      main = blocks[""]
+      blocks.delete("")
+      [main, blocks]
     end
-
-    def expand_macro(blocks)
-      macro_exp = /⦅([-\w]*)⦆/
-      blocks.inject({}) do |h, (key, lines)|
-        h[key] = lines.map do |line|
-          matches = line.scan(macro_exp).uniq
-          matches.each do |(macro_name)|
-            throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-            line.gsub!("⦅#{macro_name}⦆", @blocks[macro_name])
+  
+    def expand_macro(lines, depth = 0)
+      throw "too deep macro expansion {depth}" if depth > 1000
+      white_space_exp = /^(\s*)(.*\n?)/
+      macro_substitution_exp = /⦅([-\w]*)⦆/
+      lines.map do |line|
+        white_space, text = white_space_exp.match(line)[1..2]
+        section = text.split(macro_substitution_exp)
+          .each_slice(2)
+          .inject([white_space]) do
+            |(*new_lines, last_line), (before, macro_name)|
+            if macro_name.nil?
+              new_lines << last_line + before
+            else
+              throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
+              macro_lines = expand_macro(@blocks[macro_name], depth + 1)
+              new_line = last_line + before + macro_lines[0]
+              macro_continued = macro_lines[1..-1].map do |macro_line|
+                white_space + macro_line
+              end
+              (new_lines << new_line) + macro_continued
+            end
           end
-          line
-        end
-        h
-      end
+      end.flatten(1)
     end
-
+  
     def write(output)
       fout = File.open(output, 'w')
       tangle() unless @tangled
-      @blocks[""].each {|line| fout << line}
+      @block.each {|line| fout << line}
     end
   end
+
 
   # supplemental methods here
 

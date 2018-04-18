@@ -1,5 +1,9 @@
 # Lmt-Ruby
 
+``` text description
+A literate markdown tangle tool written in Ruby
+```
+
 Lmt is a literate markdown tangle program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
 
 In literate programming, a program is contained within a prose essay describing the thinking which goes into the program.  The source code is then extracted from the essay using a program called tangle (this application).  The essay can also be formatted into a document for human consumption using a program called "weave".
@@ -43,9 +47,30 @@ To append to a block, just open it again.  The macro expansion only happens afte
 # more comments
 ```
 
-We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.
+We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside ⦅⦆ refers to a block by name and should be replaced by the contents of that block.  To include those symbols, they can be escaped, in which case they will be emitted with the ⦅ and ⦆ intact.
+
+```ruby comment 
+# \⦅should be unaltered\⦆
+```
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
+
+## Interface
+
+We need to know where to get the input from and where to send the output to.  For that, we will use the following command line options
+
+``` ruby options
+on("--file FILE", "-f", "input file")
+on("--output FILE", "-o", "output file")
+```
+
+Of which, both are required
+
+``` ruby options
+# TODO: required arguments
+#arg :file
+#arg :output
+```
 
 ## Implementation and Example
 
@@ -63,12 +88,9 @@ class App
 
   ⦅comment⦆
 
-  main do # Add args you want: |like,so|
-    # your program code here
-    # You can access CLI options via
-    # the options Hash
+  main do
     begin
-      ⦅tangle_routine⦆
+      ⦅main_body⦆
     rescue Exception => e
       puts "Error: #{e.message} At:"
       e.backtrace.each do |trace|
@@ -79,26 +101,8 @@ class App
 
   ⦅tangle_class⦆
 
-  # supplemental methods here
-
-  # Declare command-line interface here
-
-  # description "one line description of your app"
-  #
-  # Accept flags via:
-  # on("--flag VAL","Some flag")
-  # options[flag] will contain VAL
-  #
-  # Specify switches via:
-  # on("--[no-]switch","Some switch")
-  #
-  # Or, just call OptionParser methods on opts
-  #
-  # Require an argument
-  # arg :some_arg 
-  #
-  # # Make an argument optional
-  # arg :optional_arg, :optional
+  description "⦅description⦆"
+  ⦅options⦆
 
   version Lmt::VERSION
 
@@ -106,9 +110,13 @@ class App
 
   go! if __FILE__ == $0
 end
+
 ```
 
-``` ruby tangle_routine
+This is a basic template using the [Ruby methadone](https://github.com/davetron5000/methadone) command line application framework and making sure that we report errors (because silent failure sucks).
+
+
+``` ruby main_body
 tangler = App::Tangler.new("src/lmt.lmd")
 tangler.tangle()
 tangler.write("bin/lmt")
@@ -124,7 +132,6 @@ require 'fileutils'
 ``` ruby tangle_class
 class Tangler
   def initialize(input)
-    @in_block = false
     @block = ""
     @blocks = {}
     @tangled = false
@@ -134,7 +141,8 @@ class Tangler
   def tangle()
     contents = read_file_lines()
     @block, @blocks = parse_blocks(contents)
-    @block = expand_macro(@block)
+    @block = expand_macros(@block)
+    @block = handle_escapes(@block)
     @tangled = true
   end
 
@@ -147,10 +155,10 @@ class Tangler
 
   def parse_blocks(lines)
     code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
+    in_block = false
     blocks = lines.find_all do |line|
-      b = @in_block
-      @in_block = !@in_block if line =~ code_block_exp
-      @in_block
+      in_block = !in_block if line =~ code_block_exp
+      in_block
     end.slice_before do |line|
       code_block_exp =~ line
     end.map do |(header, *rest)|
@@ -166,7 +174,7 @@ class Tangler
     [main, blocks]
   end
 
-  def expand_macro(lines, depth = 0)
+  def expand_macros(lines, depth = 0)
     throw "too deep macro expansion {depth}" if depth > 1000
     white_space_exp = /^(\s*)(.*\n?)/
     macro_substitution_exp = /⦅([-\w]*)⦆/
@@ -180,7 +188,7 @@ class Tangler
             new_lines << last_line + before
           else
             throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-            macro_lines = expand_macro(@blocks[macro_name], depth + 1)
+            macro_lines = expand_macros(@blocks[macro_name], depth + 1)
             new_line = last_line + before + macro_lines[0]
             macro_continued = macro_lines[1..-1].map do |macro_line|
               white_space + macro_line
@@ -189,6 +197,14 @@ class Tangler
           end
         end
     end.flatten(1)
+  end
+
+  def handle_escapes(block)
+    block.map do |l|
+      l = l.gsub("\\\⦅", "⦅")
+      l = l.gsub("\\\⦆", "⦆")
+      l
+    end
   end
 
   def write(output)

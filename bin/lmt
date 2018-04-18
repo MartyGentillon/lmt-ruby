@@ -11,15 +11,13 @@ class App
   include Methadone::Main
   include Methadone::CLILogging
 
-  #  This is a comment
+  # This is a comment
   # this is actually a comment
   # more comments
+  # ⦅should be unaltered⦆
 
 
-  main do # Add args you want: |like,so|
-    # your program code here
-    # You can access CLI options via
-    # the options Hash
+  main do
     begin
       tangler = App::Tangler.new("src/lmt.lmd")
       tangler.tangle()
@@ -35,7 +33,6 @@ class App
 
   class Tangler
     def initialize(input)
-      @in_block = false
       @block = ""
       @blocks = {}
       @tangled = false
@@ -45,7 +42,8 @@ class App
     def tangle()
       contents = read_file_lines()
       @block, @blocks = parse_blocks(contents)
-      @block = expand_macro(@block)
+      @block = expand_macros(@block)
+      @block = handle_escapes(@block)
       @tangled = true
     end
   
@@ -58,10 +56,10 @@ class App
   
     def parse_blocks(lines)
       code_block_exp = /^[s]*``` ?[\w]* ?(=?)([-\w]*)?/
+      in_block = false
       blocks = lines.find_all do |line|
-        b = @in_block
-        @in_block = !@in_block if line =~ code_block_exp
-        @in_block
+        in_block = !in_block if line =~ code_block_exp
+        in_block
       end.slice_before do |line|
         code_block_exp =~ line
       end.map do |(header, *rest)|
@@ -77,7 +75,7 @@ class App
       [main, blocks]
     end
   
-    def expand_macro(lines, depth = 0)
+    def expand_macros(lines, depth = 0)
       throw "too deep macro expansion {depth}" if depth > 1000
       white_space_exp = /^(\s*)(.*\n?)/
       macro_substitution_exp = /⦅([-\w]*)⦆/
@@ -91,7 +89,7 @@ class App
               new_lines << last_line + before
             else
               throw "Macro #{macro_name} unknown" unless @blocks[macro_name]
-              macro_lines = expand_macro(@blocks[macro_name], depth + 1)
+              macro_lines = expand_macros(@blocks[macro_name], depth + 1)
               new_line = last_line + before + macro_lines[0]
               macro_continued = macro_lines[1..-1].map do |macro_line|
                 white_space + macro_line
@@ -102,6 +100,14 @@ class App
       end.flatten(1)
     end
   
+    def handle_escapes(block)
+      block.map do |l|
+        l = l.gsub("\\⦅", "⦅")
+        l = l.gsub("\\⦆", "⦆")
+        l
+      end
+    end
+  
     def write(output)
       fout = File.open(output, 'w')
       tangle() unless @tangled
@@ -110,26 +116,14 @@ class App
   end
 
 
-  # supplemental methods here
+  description "A literate markdown tangle tool written in Ruby
+"
+  on("--file FILE", "-f", "input file")
+  on("--output FILE", "-o", "output file")
+  # TODO: required arguments
+  #arg :file
+  #arg :output
 
-  # Declare command-line interface here
-
-  # description "one line description of your app"
-  #
-  # Accept flags via:
-  # on("--flag VAL","Some flag")
-  # options[flag] will contain VAL
-  #
-  # Specify switches via:
-  # on("--[no-]switch","Some switch")
-  #
-  # Or, just call OptionParser methods on opts
-  #
-  # Require an argument
-  # arg :some_arg 
-  #
-  # # Make an argument optional
-  # arg :optional_arg, :optional
 
   version Lmt::VERSION
 
@@ -137,3 +131,4 @@ class App
 
   go! if __FILE__ == $0
 end
+

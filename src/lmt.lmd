@@ -23,6 +23,8 @@ In order to be useful for literate programming we need a few features:
 5. The ability to append to or replace code blocks
 6. The ability to extend the tangler with Ruby code from a block.
 
+### Macros
+
 Markdown already supports code blocks expressed with code fences starting with three backticks, usually enabling syntax highlighting on the output.  This should work excellently for identifying block boundaries.
 
 In order to add the features we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For example
@@ -251,7 +253,7 @@ def parse_blocks(lines)
     bodies.map { |(_, body)| body}
       .flatten(1)
   end.transform_values do |body_lines|
-    body_lines[-1] = body_lines[-1].chomp
+    body_lines[-1] = body_lines[-1].chomp if body_lines[-1]
     body_lines
   end
   throw "Missing code fence" if in_block
@@ -324,6 +326,25 @@ end
 
 ```
 
+## Self Test, Details
+### Regressions
+
+Some regressions / edge cases that we need to watch for.  These should not break our tangle operation.
+
+#### Empty Blocks
+
+We need to be able to tangle empty blocks such as:
+
+``` ruby intentionally_empty_block
+```
+
+#### Unused blocks referencing nonexistent blocks
+
+If a block is unused, then don't break if it uses a nonexistent block.
+
+``` ruby unused_block
+⦅this_block_does_not_exist⦆
+```
 ## Fin ┐( ˘_˘)┌
 
 And with that, we have tangled a file.

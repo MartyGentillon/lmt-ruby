@@ -88,7 +88,7 @@ class App
         bodies.map { |(_, body)| body}
           .flatten(1)
       end.transform_values do |body_lines|
-        body_lines[-1] = body_lines[-1].chomp
+        body_lines[-1] = body_lines[-1].chomp if body_lines[-1]
         body_lines
       end
       throw "Missing code fence" if in_block

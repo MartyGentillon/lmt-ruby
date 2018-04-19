@@ -212,6 +212,9 @@ class Tangler
   ⦅apply_filters⦆
   ⦅unescape_double_parens⦆
   ⦅write⦆
+
+  private
+  ⦅tangle_class_privates⦆
 end
 ```
 
@@ -280,19 +283,11 @@ def parse_blocks(lines)
   end.map do |(header, *rest)|
     white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
     [name, replacement_mark, rest]
-  end.group_by do |(name, _)|
+  end.group_by do |(name, _, _)|
     name
   end.transform_values do |bodies|
-    last_replacement = bodies.each_with_index
-        .select do |((_, replacement_mark, _), _)|
-          replacement_mark == '='
-        end[-1]
-    last_replacement_index = if last_replacement
-          last_replacement[1]
-        else
-          0
-        end
-    bodies[last_replacement_index..-1].map { |(_, replacement_mark, body)| body}
+    last_replacement_index = get_last_replacement_index(bodies)
+    bodies[last_replacement_index..-1].map { |(_, _, body)| body}
       .flatten(1)
   end.transform_values do |body_lines|
     body_lines[-1] = body_lines[-1].chomp if body_lines[-1]
@@ -306,6 +301,23 @@ end
 
 ```
 
+So, after we turn each block chunk into an array of `[name, replacement_mark, body]` we can find the last one by scanning for a replacement mark set to `=`.  Otherwise the answer is `0`.
+
+``` ruby tangle_class_privates
+def get_last_replacement_index(bodies)
+  last_replacement = bodies.each_with_index
+      .select do |((_, replacement_mark, _), _)|
+        replacement_mark == '='
+      end[-1]
+  if last_replacement
+    last_replacement[1]
+  else
+    0
+  end
+end
+
+```
+
 ### Handling the macros
 
 The other half of the meat.  Here we use two regular expressions.  One to identify and propagate whitespace and the other to actually find the replacements in a line.
@@ -315,42 +327,50 @@ This is implemented by splitting the line on the replacement section, grouping i
 ``` ruby expand_macros
 def expand_macros(lines, depth = 0)
   throw "too deep macro expansion {depth}" if depth > 1000
-  white_space_exp = /^(\s*)(.*\n?)/
-  macro_substitution_exp = /(?<!\\)⦅ *([-\w | ]*) *⦆/
-  filter_extraction_exp = / *\| *([-\w]+) */
   lines.map do |line|
     begin
-      white_space, text = white_space_exp.match(line)[1..2]
-      section = text.split(macro_substitution_exp)
-          .each_slice(2)
-          .map do |(before, macro_match)|
-            if (macro_match)
-              macro_name, *filters = macro_match.strip.split(filter_extraction_exp)
-              [before, macro_name, filters.each_slice(2).map(&:first)]
-            else
-              [before]
-            end
-          end.inject([white_space]) do
-            |(*new_lines, last_line), (before, macro_name, filters)|
-            if macro_name.nil?
-              new_lines << last_line + before
-            else
-              throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
-              macro_lines = apply_filters(
-                  expand_macros(@blocks[macro_name], depth + 1), filters)
-              new_line = last_line + before + macro_lines[0]
-              macro_continued = macro_lines[1..-1].map do |macro_line|
-                white_space + macro_line
-              end
-              (new_lines << new_line) + macro_continued
-            end
-          end
+      expand_macro_on_line(line, depth)
     rescue Exception => e
       raise "Failed to process line: #{line}"
     end
   end.flatten(1)
 end
 
+```
+
+Expand_macro_on_line turns a line into a list of lines.  The collected results will have to be flattened by 1.
+
+``` ruby tangle_class_privates
+def expand_macro_on_line(line, depth)
+  white_space_exp = /^(\s*)(.*\n?)/
+  macro_substitution_exp = /(?<!\\)⦅ *([-\w | ]*) *⦆/
+  filter_extraction_exp = / *\| *([-\w]+) */
+  white_space, text = white_space_exp.match(line)[1..2]
+  section = text.split(macro_substitution_exp)
+      .each_slice(2)
+      .map do |(before, macro_match)|
+        if (macro_match)
+          macro_name, *filters = macro_match.strip.split(filter_extraction_exp)
+          [before, macro_name, filters.each_slice(2).map(&:first)]
+        else
+          [before]
+        end
+      end.inject([white_space]) do
+        |(*new_lines, last_line), (before, macro_name, filters)|
+        if macro_name.nil?
+          new_lines << last_line + before
+        else
+          throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
+          macro_lines = apply_filters(
+              expand_macros(@blocks[macro_name], depth + 1), filters)
+          new_line = last_line + before + macro_lines[0]
+          macro_continued = macro_lines[1..-1].map do |macro_line|
+            white_space + macro_line
+          end
+          (new_lines << new_line) + macro_continued
+        end
+      end
+end
 ```
 
 ### Unescaping Double Parentheses

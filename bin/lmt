@@ -11,6 +11,7 @@ class App
   @dev = true
 
   main do
+    check_arguments()
     begin
       self_test()
       tangler = App::Tangler.new(options[:file])
@@ -185,10 +186,24 @@ class App
     end
   end
 
+  def self.required(*options)
+    @required_options = options
+  end
+  
+  def self.check_arguments
+    missing = @required_options.select{ |p| options[p].nil?}
+    unless missing.empty?
+      message = "Missing Required Argument(s): #{missing.join(', ')}"
+  
+      abort("#{message}\n\n#{opts.help()}")
+    end
+  end
+
   description "A literate markdown tangle tool written in Ruby."
-  on("--file FILE", "-f", "input file")
-  on("--output FILE", "-o", "output file")
+  on("--file FILE", "-f", "Required: input file")
+  on("--output FILE", "-o", "Required: output file")
   on("--dev", "disables self test failure for development")
+  required(:file, :output)
   # TODO: required arguments
   #arg :file
   #arg :output

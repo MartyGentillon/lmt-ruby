@@ -16,12 +16,14 @@ While there are other markdown tanglers available (especially [lmt](https://gith
 
 In order to be useful for literate programming we need a few features:
 
-1. The ability to strip code out of a markdown file and place it into a tangled file with either a default or specified name.
+1. The ability to strip code out of a markdown file and place it into a tangled output file.
 2. The ability to embed macros so that the code can be expressed in any order desired.
 3. The ability to apply filters on the contents of a macro
 4. The ability to to identify code blocks which will be expanded when referenced
 5. The ability to append to or replace code blocks
 6. The ability to extend the tangler with Ruby code from a block.
+
+Of these, 3 and 6 are not yet implemented.  Because of this, the tangler will complain that the ruby escape filter isn't working.
 
 ### Macros
 
@@ -112,9 +114,10 @@ end
 We need to know where to get the input from and where to send the output to.  For that, we will use the following command line options
 
 ``` ruby options
-on("--file FILE", "-f", "input file")
-on("--output FILE", "-o", "output file")
+on("--file FILE", "-f", "Required: input file")
+on("--output FILE", "-o", "Required: output file")
 on("--dev", "disables self test failure for development")
+required(:file, :output)
 ```
 
 Of which, both are required
@@ -142,6 +145,7 @@ class App
   @dev = true
 
   main do
+    check_arguments()
     begin
       ⦅main_body⦆
     rescue Exception => e
@@ -165,6 +169,8 @@ class App
   ⦅report_self_test_failure⦆
 
   ⦅tangle_class⦆
+
+  ⦅option_verification⦆
 
   description "⦅description⦆"
   ⦅options⦆
@@ -412,6 +418,25 @@ end
 ```
 
 ``` ruby ruby_escape
+```
+
+## Option Verification
+
+Sadly neither Methadone nor Optparser offer manditory option verification, so we have to add it ourselves.  (In the future, we will probably want to move this to a support library)  Doing so requires two methods, required and check_arguments
+
+``` ruby option_verification
+def self.required(*options)
+  @required_options = options
+end
+
+def self.check_arguments
+  missing = @required_options.select{ |p| options[p].nil?}
+  unless missing.empty?
+    message = "Missing Required Argument(s): #{missing.join(', ')}"
+
+    abort("#{message}\n\n#{opts.help()}")
+  end
+end
 ```
 
 ## Self Test, Details

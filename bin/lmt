@@ -13,9 +13,9 @@ class App
   main do
     begin
       self_test()
-      tangler = App::Tangler.new("src/lmt.lmd")
+      tangler = App::Tangler.new(options[:file])
       tangler.tangle()
-      tangler.write("bin/lmt")
+      tangler.write(options[:output])
     rescue Exception => e
       puts "Error: #{e.message} #{extract_causes(e)}At:"
       e.backtrace.each do |trace|

@@ -184,9 +184,9 @@ The main body will first test itself then, invoke the library component, which i
 
 ``` ruby main_body
 self_test()
-tangler = App::Tangler.new("src/lmt.lmd")
+tangler = App::Tangler.new(options[:file])
 tangler.tangle()
-tangler.write("bin/lmt")
+tangler.write(options[:output])
 ```
 
 Finally, we have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.

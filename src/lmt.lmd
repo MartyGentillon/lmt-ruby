@@ -301,7 +301,7 @@ end
 
 ```
 
-So, after we turn each block chunk into an array of `[name, replacement_mark, body]` we can find the last one by scanning for a replacement mark set to `=`.  Otherwise the answer is `0`.
+We have a private helper helper method here.  So, after we turn each block chunk into an array of `[name, replacement_mark, body]` we can find the last one by scanning for a replacement mark set to `=`.  Otherwise the answer is `0` as there is no replacement index.
 
 ``` ruby tangle_class_privates
 def get_last_replacement_index(bodies)

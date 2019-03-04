@@ -369,11 +369,15 @@ def expand_macro_on_line(line, depth)
           throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
           macro_lines = apply_filters(
               expand_macros(@blocks[macro_name], depth + 1), filters)
+          unless macro_lines.empty?
           new_line = last_line + before + macro_lines[0]
           macro_continued = macro_lines[1..-1].map do |macro_line|
             white_space + macro_line
           end
           (new_lines << new_line) + macro_continued
+          else
+            new_lines
+          end
         end
       end
 end
@@ -446,6 +450,7 @@ So, now we need to go into details of our self test and also include regressions
 ``` ruby test_description
 ⦅test_macro_insertion_description⦆
 ⦅test_filters⦆
+⦅intentionally_empty_block⦆
 ```
 
 And to report our errors:

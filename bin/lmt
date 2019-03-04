@@ -52,6 +52,7 @@ class App
     report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
     string_with_backslash = "this string ends in \."
     report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
+
   end
 
   def self.report_self_test_failure(message)
@@ -176,11 +177,15 @@ class App
               throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
               macro_lines = apply_filters(
                   expand_macros(@blocks[macro_name], depth + 1), filters)
+              unless macro_lines.empty?
               new_line = last_line + before + macro_lines[0]
               macro_continued = macro_lines[1..-1].map do |macro_line|
                 white_space + macro_line
               end
               (new_lines << new_line) + macro_continued
+              else
+                new_lines
+              end
             end
           end
     end

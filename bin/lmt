@@ -209,9 +209,6 @@ class App
   on("--output FILE", "-o", "Required: output file")
   on("--dev", "disables self test failure for development")
   required(:file, :output)
-  # TODO: required arguments
-  #arg :file
-  #arg :output
 
   version Lmt::VERSION
 

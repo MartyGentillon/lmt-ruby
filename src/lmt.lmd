@@ -117,15 +117,12 @@ We need to know where to get the input from and where to send the output to.  Fo
 on("--file FILE", "-f", "Required: input file")
 on("--output FILE", "-o", "Required: output file")
 on("--dev", "disables self test failure for development")
-required(:file, :output)
 ```
 
 Of which, both are required
 
 ``` ruby options
-# TODO: required arguments
-#arg :file
-#arg :output
+required(:file, :output)
 ```
 
 ## Implementation and Example

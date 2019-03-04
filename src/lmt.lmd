@@ -423,7 +423,7 @@ end
 
 ## Option Verification
 
-Sadly neither Methadone nor Optparser offer manditory option verification, so we have to add it ourselves.  (In the future, we will probably want to move this to a support library)  Doing so requires two methods, required and check_arguments
+Sadly neither Methadone nor Optparser offer mandatory option verification, so we have to add it ourselves.  (In the future, we will probably want to move this to a support library)  Doing so requires two methods, required and check_arguments
 
 ``` ruby option_verification
 def self.required(*options)

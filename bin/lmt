@@ -53,6 +53,8 @@ class App
     report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
     string_with_backslash = "this string ends in \\."
     report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
+    included_string = "I came from lmt_include.lmd"
+    report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
 
   end
 
@@ -100,18 +102,31 @@ class App
     end
     
     def tangle()
-      contents = read_file()
+      contents = include_includes(read_file(@input))
       @block, @blocks = parse_blocks(contents)
       @block = expand_macros(@block)
       @block = unescape_double_parens(@block)
       @tangled = true
     end
     
-    def read_file()
-      #fin = File.open(@input, 'r')
-      fin = File.open("src/lmt.lmd", 'r')
+    def read_file(file)
+      fin = File.open(file, 'r')
       last_header = nil
       fin.readlines
+    end
+    
+    def include_includes(lines, current_file = @input, depth = 0)
+      raise "too many includes" if depth > 1000
+      include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
+      lines.map do |line|
+        match = include_exp.match(line)
+        if match
+          file = File.dirname(current_file) + '/' + match[1]
+          include_includes(read_file(file), file, depth + 1)
+        else
+          [line]
+        end
+      end.flatten(1)
     end
     
     def parse_blocks(lines)

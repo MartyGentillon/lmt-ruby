@@ -22,8 +22,10 @@ In order to be useful for literate programming we need a few features:
 4. The ability to to identify code blocks which will be expanded when referenced
 5. The ability to append to or replace code blocks
 6. The ability to extend the tangler with Ruby code from a block.
+7. The ability to include another file.
+8. The ability to write out other files.
 
-Of these, 6 is not yet implemented.  Also, the only filter currently existing just escapes strings for ruby code.  There are more that could be useful.
+Of these, 6 and 8 are not yet implemented.  Also, the only filter currently existing just escapes strings for ruby code.  There are more that could be useful.
 
 ### Macros
 
@@ -98,6 +100,18 @@ There are a few built in filters:
   'ruby_escape' => ⦅ruby_escape⦆
 }
 ```
+
+### Includes
+
+Other files may be using an include directive and a markdown link.  Include directive are lines starting with `! include` followed by a space.  No further text may follow the markdown link.  Paths are relative to the file being included from.
+
+During tangle the link line will be replaced with the lines from the included file.  This means that they may replace blocks defined in the file that includes them such as this one
+
+``` ruby included_block
+included_string = "I am in lmt.lmd"
+```
+
+! include [an include](lmt_incluce.md)
 
 ### Self Test
 
@@ -218,6 +232,7 @@ class Tangler
   ⦅initializer⦆
   ⦅tangle⦆
   ⦅read_file⦆
+  ⦅include_includes⦆
   ⦅parse_blocks⦆
   ⦅expand_macros⦆
   ⦅apply_filters⦆
@@ -245,11 +260,11 @@ end
 
 ### Tangle
 
-Now we have the basic tangle process wherein a file is read, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.
+Now we have the basic tangle process wherein a file is read, includes are substituted, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.
 
 ``` ruby tangle
 def tangle()
-  contents = read_file()
+  contents = include_includes(read_file(@input))
   @block, @blocks = parse_blocks(contents)
   @block = expand_macros(@block)
   @block = unescape_double_parens(@block)
@@ -263,11 +278,31 @@ end
 This is fairly self explanatory, though note, we are storing the file in memory as an array of lines.
 
 ``` ruby read_file
-def read_file()
-  #fin = File.open(@input, 'r')
-  fin = File.open("src/lmt.lmd", 'r')
+def read_file(file)
+  fin = File.open(file, 'r')
   last_header = nil
   fin.readlines
+end
+
+```
+
+### Including the Includes
+
+Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.
+
+``` ruby include_includes
+def include_includes(lines, current_file = @input, depth = 0)
+  raise "too many includes" if depth > 1000
+  include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
+  lines.map do |line|
+    match = include_exp.match(line)
+    if match
+      file = File.dirname(current_file) + '/' + match[1]
+      include_includes(read_file(file), file, depth + 1)
+    else
+      [line]
+    end
+  end.flatten(1)
 end
 
 ```
@@ -495,6 +530,7 @@ So, now we need to go into details of our self test and also include regressions
 ⦅intentionally_empty_block⦆
 ⦅test_macro_insertion_description⦆
 ⦅test_filters⦆
+⦅test_inclusion⦆
 ⦅intentionally_empty_block⦆
 ```
 
@@ -536,6 +572,13 @@ At the [top of the file](Filters) we described the usage of filters.  Let's make
 ``` ruby test_filters
 ⦅filter_use_description⦆
 report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
+```
+
+### Testing: Inclusion
+
+``` ruby test_inclusion
+⦅included_block⦆
+report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
 ```
 
 ### Regressions

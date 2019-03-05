@@ -1,22 +1,22 @@
 # Lmt-Ruby
 
 ``` text description
-A literate markdown tangle tool written in Ruby.
+A literate Markdown tangle tool written in Ruby.
 ```
 
-Lmt is a literate markdown tangle program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
+Lmt is a literate Markdown tangle program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
 
-In literate programming, a program is contained within a prose essay describing the thinking which goes into the program.  The source code is then extracted from the essay using a program called tangle (this application).  The essay can also be formatted into a document for human consumption using a program called "weave".
+In literate programming, a program is contained within a prose essay describing the thinking which goes into the program.  The source code is then extracted from the essay using a program called tangle (this application).  The essay can also be formatted into a document for human consumption using a program called "weave" and can be found [here](lmm.md).
 
 ## Why?
 
-While there are other markdown tanglers available (especially [lmt](https://github.com/driusan/lmt), which this program is designed to be superficially similar to) none quite match the combination of simplicity and extensibility which I need.
+While there are other Markdown tanglers available (especially [lmt](https://github.com/driusan/lmt), which this program is designed to be superficially similar to) none quite match the combination of simplicity and extensibility which I need.
 
 ## Features
 
 In order to be useful for literate programming we need a few features:
 
-1. The ability to strip code out of a markdown file and place it into a tangled output file.
+1. The ability to strip code out of a Markdown file and place it into a tangled output file.
 2. The ability to embed macros so that the code can be expressed in any order desired.
 3. The ability to apply filters on the contents of a macro
 4. The ability to to identify code blocks which will be expanded when referenced
@@ -38,7 +38,7 @@ In order to add the features we need, we will need to add header content at the 
 block_replacement = false
 ```
 
-Of course, these do not play well with markdown rendering, so we will need a weaver to display the name appropriately.
+Of course, these do not play well with Markdown rendering, so we will need a weaver to display the name appropriately.
 
 To replace a block put `=` before the block name like so:
 
@@ -394,24 +394,24 @@ def expand_macro_on_line(line, depth)
   white_space, text = white_space_exp.match(line)[1..2]
   section = text.split(macro_substitution_exp)
       .each_slice(2)
-      .map do |(before, macro_match)|
+      .map do |(text_before_macro, macro_match)|
         if (macro_match)
           macro_name, *filters = macro_match.strip.split(filter_extraction_exp)
-          [before, macro_name, filters.each_slice(2).map(&:first)]
+          [text_before_macro, macro_name, filters.each_slice(2).map(&:first)]
         else
-          [before]
+          [text_before_macro]
         end
       end.inject([white_space]) do
-        |(*new_lines, last_line), (before, macro_name, filters)|
+        |(*new_lines, last_line), (text_before_macro, macro_name, filters)|
         if macro_name.nil?
           last_line = "" unless last_line
-          new_lines << last_line + before
+          new_lines << last_line + text_before_macro
         else
           throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
           macro_lines = apply_filters(
               expand_macros(@blocks[macro_name], depth + 1), filters)
           unless macro_lines.empty?
-            new_line = last_line + before + macro_lines[0]
+            new_line = last_line + text_before_macro + macro_lines[0]
             macro_continued = macro_lines[1..-1].map do |macro_line|
               white_space + macro_line
             end
@@ -559,10 +559,23 @@ report_self_test_failure("insertion must support spaces") unless insertion_works
 report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
 ```
 
+Finally, we need to make sure two macros on the same line works.
+
+``` ruby test_macro_insertion_description
+two_macros = "⦅foo⦆ ⦅foo⦆"
+report_self_test_failure("Should be able to place two macros on the same line") unless two_macros == "foo foo"
+```
+
 For that to work we need:
 
 ``` ruby insertion_works_with_spaces
 insertion_works_with_spaces = true
+```
+
+and
+
+``` ruby foo
+foo
 ```
 
 ### Testing: Filters

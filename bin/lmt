@@ -51,6 +51,8 @@ class App
     report_self_test_failure("appending to macros doesn't work") unless block_appendment
     report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
     report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
+    two_macros = "foo foo"
+    report_self_test_failure("Should be able to place two macros on the same line") unless two_macros == "foo foo"
     string_with_backslash = "this string ends in \\."
     report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
     included_string = "I came from lmt_include.lmd"
@@ -209,24 +211,24 @@ class App
       white_space, text = white_space_exp.match(line)[1..2]
       section = text.split(macro_substitution_exp)
           .each_slice(2)
-          .map do |(before, macro_match)|
+          .map do |(text_before_macro, macro_match)|
             if (macro_match)
               macro_name, *filters = macro_match.strip.split(filter_extraction_exp)
-              [before, macro_name, filters.each_slice(2).map(&:first)]
+              [text_before_macro, macro_name, filters.each_slice(2).map(&:first)]
             else
-              [before]
+              [text_before_macro]
             end
           end.inject([white_space]) do
-            |(*new_lines, last_line), (before, macro_name, filters)|
+            |(*new_lines, last_line), (text_before_macro, macro_name, filters)|
             if macro_name.nil?
               last_line = "" unless last_line
-              new_lines << last_line + before
+              new_lines << last_line + text_before_macro
             else
               throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
               macro_lines = apply_filters(
                   expand_macros(@blocks[macro_name], depth + 1), filters)
               unless macro_lines.empty?
-                new_line = last_line + before + macro_lines[0]
+                new_line = last_line + text_before_macro + macro_lines[0]
                 macro_continued = macro_lines[1..-1].map do |macro_line|
                   white_space + macro_line
                 end
@@ -252,7 +254,7 @@ class App
     end
   end
 
-  description "A literate markdown tangle tool written in Ruby."
+  description "A literate Markdown tangle tool written in Ruby."
   on("--file FILE", "-f", "Required: input file")
   on("--output FILE", "-o", "Required: output file")
   on("--dev", "disables self test failure for development")

@@ -50,7 +50,7 @@ class App
     report_self_test_failure("appending to macros doesn't work") unless block_appendment
     report_self_test_failure("insertion must support spaces") unless insertion_works_with_spaces
     report_self_test_failure("double parentheses may be escaped") unless escaped_string[0] != '\\'
-    string_with_backslash = "this string ends in \."
+    string_with_backslash = "this string ends in \\."
     report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
 
   end
@@ -62,8 +62,35 @@ class App
       throw message
     end
   end
+  
+  class Filter
+    def initialize(&block)
+      @code = block;
+    end
+  
+    def filter(lines)
+      @code.call(lines)
+    end
+  end
+  class LineFilter < Filter
+    def filter(lines)
+      lines.map do |line|
+        @code.call(line)
+      end
+    end
+  end
 
   class Tangler
+    class << self
+      attr_reader :filters
+    end
+  
+    @filters = {
+      'ruby_escape' => LineFilter.new do |line|
+        line.dump[1..-2]
+      end
+    }
+  
     def initialize(input)
       @input = input
       @block = ""
@@ -119,13 +146,17 @@ class App
         begin
           expand_macro_on_line(line, depth)
         rescue Exception => e
-          raise "Failed to process line: #{line}"
+          raise Exception, "Failed to process line: #{line}", e.backtrace
         end
       end.flatten(1)
     end
     
     def apply_filters(strings, filters)
-      strings
+      filters.map do |filter_name|
+        Tangler.filters[filter_name]
+      end.inject(strings) do |strings, filter|
+        filter.filter(strings)
+      end
     end
     def unescape_double_parens(block)
       block.map do |l|
@@ -178,11 +209,11 @@ class App
               macro_lines = apply_filters(
                   expand_macros(@blocks[macro_name], depth + 1), filters)
               unless macro_lines.empty?
-              new_line = last_line + before + macro_lines[0]
-              macro_continued = macro_lines[1..-1].map do |macro_line|
-                white_space + macro_line
-              end
-              (new_lines << new_line) + macro_continued
+                new_line = last_line + before + macro_lines[0]
+                macro_continued = macro_lines[1..-1].map do |macro_line|
+                  white_space + macro_line
+                end
+                (new_lines << new_line) + macro_continued
               else
                 new_lines
               end

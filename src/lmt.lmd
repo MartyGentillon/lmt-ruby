@@ -369,6 +369,7 @@ def expand_macro_on_line(line, depth)
       end.inject([white_space]) do
         |(*new_lines, last_line), (before, macro_name, filters)|
         if macro_name.nil?
+          last_line = "" unless last_line
           new_lines << last_line + before
         else
           throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
@@ -491,6 +492,7 @@ end
 So, now we need to go into details of our self test and also include regressions which have caused problems.
 
 ``` ruby test_description
+⦅intentionally_empty_block⦆
 ⦅test_macro_insertion_description⦆
 ⦅test_filters⦆
 ⦅intentionally_empty_block⦆

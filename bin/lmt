@@ -34,6 +34,7 @@ class App
   end
 
   def self.self_test()
+    
     block_replacement = true
     replaced_block = false
     block_appendment = false
@@ -203,6 +204,7 @@ class App
           end.inject([white_space]) do
             |(*new_lines, last_line), (before, macro_name, filters)|
             if macro_name.nil?
+              last_line = "" unless last_line
               new_lines << last_line + before
             else
               throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]

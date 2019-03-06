@@ -21,11 +21,14 @@ In order to be useful for literate programming we need a few features:
 3. The ability to apply filters on the contents of a macro
 4. The ability to to identify code blocks which will be expanded when referenced
 5. The ability to append to or replace code blocks
-6. The ability to extend the tangler with Ruby code from a block.
-7. The ability to include another file.
-8. The ability to write out other files.
+6. The ability to include another file.
 
-Of these, 6 and 8 are not yet implemented.  Also, the only filter currently existing just escapes strings for ruby code.  There are more that could be useful.
+There are also a few potentially useful features that are not implemented but might be in the future:
+
+1. The ability to extend the tangler with Ruby code from a block.
+2. The ability to write out other files.
+
+Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
 
 ### Macros
 
@@ -130,7 +133,6 @@ We need to know where to get the input from and where to send the output to.  Fo
 ``` ruby options
 on("--file FILE", "-f", "Required: input file")
 on("--output FILE", "-o", "Required: output file")
-on("--dev", "disables self test failure for development")
 ```
 
 Of which, both are required
@@ -617,8 +619,6 @@ If a block is unused, then don't break if it uses a nonexistent block.
 
 And with that, we have tangled a file.
 
-At current, there are a few more features that we need to deal with.  First, when combining declarations for a single block, we need to support replacement.  Second, we have yet to add the idea of filters.  Thirdly, this does not yet support extension by commands.  These features can wait for now.
-
-Moreover, there are a couple development props which need to be removed, and the arguments need to be wired in.
+At current, there are a few more features that would be nice to have. First, this does not yet support extension by commands.  Second, we cannot write to any file other than the output file.  Third, we don't have many filters.  These features can wait for now.
 
 ∎

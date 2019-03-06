@@ -257,7 +257,6 @@ class App
   description "A literate Markdown tangle tool written in Ruby."
   on("--file FILE", "-f", "Required: input file")
   on("--output FILE", "-o", "Required: output file")
-  on("--dev", "disables self test failure for development")
   required(:file, :output)
 
   version Lmt::VERSION

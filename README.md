@@ -24,7 +24,11 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+The program takes input files and produces output files.  It is used as follows:
+
+``` bash
+bin/lmt --file {input file} --output {tangled destination}
+```
 
 ## Development
 
@@ -40,4 +44,13 @@ bundle exec ruby bin/lmt --file src/lmt.lmd --output bin/lmt
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/lmt.
+Bug reports and pull requests are welcome on GitHub at https://github.com/MartyGentillon/lmt-ruby.
+
+## Prior Art
+
+Some related and similar tools that the reader might find interesting:
+
+* <<https://github.com/driusan/lmt>>
+* <<https://github.com/rebcabin/tangledown>>
+* <<https://github.com/vlead/literate-tools>>
+* <<https://github.com/mqsoh/knot>>

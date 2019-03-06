@@ -28,6 +28,7 @@ There are also a few potentially useful features that are not implemented but mi
 1. The ability to extend the tangler with Ruby code from a block.
 2. The ability to write out other files.
 3. Source mapping
+4. Further source verification.  For instance, all instances of the same block should be in the same language.
 
 Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
 
@@ -292,12 +293,16 @@ end
 
 ### Including the Includes
 
+As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  Those expressions are detailed in:
+
+! include [here](lmt_expressions.lmd)  
+
 Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.
 
 ``` ruby include_includes
 def include_includes(lines, current_file = @input, depth = 0)
   raise "too many includes" if depth > 1000
-  include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
+  include_exp = ⦅include_expression⦆
   lines.map do |line|
     match = include_exp.match(line)
     if match
@@ -313,11 +318,9 @@ end
 
 ### Parsing The Blocks
 
-Now we get to the meat of the algorithm.  As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  Those expressions are detailed in:
+Now we get to the meat of the algorithm.  
 
-! include [here](lmt_expressions.lmd)  
-
-We then filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks which follow the last reset for that block name.
+First, we filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks which follow the last reset for that block name.
 
 We also need to remove the last newline from the block as it causes problems when injecting a block onto a line with stuff after the end.
 

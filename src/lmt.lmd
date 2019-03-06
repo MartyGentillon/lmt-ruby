@@ -312,7 +312,9 @@ end
 
 ### Parsing The Blocks
 
-Now we get to the meat of the algorithm.  As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  The first expression is intended to note when whe enter or leave a code block.
+Now we get to the meat of the algorithm.  As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  Those expressions are detailed in:
+
+! include [here](lmt_expressions.lmd)  
 
 We then filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks which follow the last reset for that block name.
 
@@ -322,7 +324,7 @@ Finally, (after making sure we aren't missing a code fence) we extract the unnam
 
 ``` ruby parse_blocks
 def parse_blocks(lines)
-  code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
+  code_block_exp = ⦅code_block_expression⦆
   in_block = false
   blocks = lines.find_all do |line|
     in_block = !in_block if line =~ code_block_exp
@@ -330,7 +332,7 @@ def parse_blocks(lines)
   end.slice_before do |line|
     code_block_exp =~ line
   end.map do |(header, *rest)|
-    white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
+    white_space, language, replacement_mark, name = code_block_exp.match(header)[1..-1]
     [name, replacement_mark, rest]
   end.group_by do |(name, _, _)|
     name
@@ -389,12 +391,19 @@ end
 
 Expand_macro_on_line turns a line into a list of lines.  The collected results will have to be flattened by 1.
 
+First we process the white space off the front of the expression.  This will be added to each line in the extended macros so that the output file is nicely indented.  It also means that indentation sensitive languages like python will be tangled correctly.
+
 ``` ruby tangle_class_privates
 def expand_macro_on_line(line, depth)
   white_space_exp = /^(\s*)(.*\n?)/
-  macro_substitution_exp = /(?<!\\)⦅ *([-\w | ]*) *⦆/
+  macro_substitution_exp = ⦅macro_substitution_expression⦆
   filter_extraction_exp = / *\| *([-\w]+) */
   white_space, text = white_space_exp.match(line)[1..2]
+```
+
+Then we chop it into pieces using the [macro substitution expression](lmt_expressions.lmd#The-Macro-Substitution-Expression) This results in text, macro_name / filter pairs.  If there is a macro name, we then split the filter names off with the filter expression which provides filter names followed by stuff between them (nothing) which we discard.
+
+``` ruby tangle_class_privates
   section = text.split(macro_substitution_exp)
       .each_slice(2)
       .map do |(text_before_macro, macro_match)|
@@ -404,12 +413,22 @@ def expand_macro_on_line(line, depth)
         else
           [text_before_macro]
         end
+```
+
+Finally, we are ready to actually process the text and macros.  We build the list of ines with just the white space, and appending the results of precessing to the end.  Each potential line is built up by appending to the end of the last line.  If there is no macro, then we can just append the text.  
+
+``` ruby tangle_class_privates
       end.inject([white_space]) do
         |(*new_lines, last_line), (text_before_macro, macro_name, filters)|
         if macro_name.nil?
           last_line = "" unless last_line
           new_lines << last_line + text_before_macro
         else
+```
+
+If there is a macro substitution, first we get the new lines.  The we append the first line of the macro text to the last line.  Finally, we append the white space to the front of each of the macro's lines and insert them into the middle.  of the list of lines we are building.
+
+``` ruby tangle_class_privates
           throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
           macro_lines = apply_filters(
               expand_macros(@blocks[macro_name], depth + 1), filters)
@@ -426,6 +445,8 @@ def expand_macro_on_line(line, depth)
       end
 end
 ```
+
+Finally, throughout this process, we have to be ware that a macro may have no content.  We must deal with `nil` and empty lists where they occur.
 
 ### Unescaping Double Parentheses
 

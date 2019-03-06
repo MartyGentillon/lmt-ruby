@@ -132,7 +132,7 @@ class App
     end
     
     def parse_blocks(lines)
-      code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
+      code_block_exp = /^([s]*)``` ?([\w]*) ?(=?)([-\w]*)?/
       in_block = false
       blocks = lines.find_all do |line|
         in_block = !in_block if line =~ code_block_exp
@@ -140,7 +140,7 @@ class App
       end.slice_before do |line|
         code_block_exp =~ line
       end.map do |(header, *rest)|
-        white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
+        white_space, language, replacement_mark, name = code_block_exp.match(header)[1..-1]
         [name, replacement_mark, rest]
       end.group_by do |(name, _, _)|
         name

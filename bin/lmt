@@ -112,9 +112,9 @@ class App
     end
     
     def read_file(file)
-      fin = File.open(file, 'r')
-      last_header = nil
-      fin.readlines
+      File.open(file, 'r') do |f|
+        f.readlines
+      end
     end
     
     def include_includes(lines, current_file = @input, depth = 0)

@@ -28,7 +28,7 @@ There are also a few potentially useful features that are not implemented but mi
 1. The ability to extend the tangler with Ruby code from a block.
 2. The ability to write out other files.
 3. Source mapping
-4. Further source verification.  For instance, all instances of the same block should be in the same language.
+4. Further source verification.  For instance, all instances of the same block should be in the same language.  Also, detect and prevent double inclusion.
 
 Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
 
@@ -284,9 +284,9 @@ This is fairly self explanatory, though note, we are storing the file in memory 
 
 ``` ruby read_file
 def read_file(file)
-  fin = File.open(file, 'r')
-  last_header = nil
-  fin.readlines
+  File.open(file, 'r') do |f|
+    f.readlines
+  end
 end
 
 ```
@@ -318,7 +318,7 @@ end
 
 ### Parsing The Blocks
 
-Now we get to the meat of the algorithm.  
+Now we get to the meat of the algorithm.  This uses the regular expression in [lmt_expressions](lmt_expressions.lmd#The-Code-Block-Expression)
 
 First, we filter out all non block lines, keeping the block headers, slice it into separate blocks at the header, process the header and turn it into a map of lists of lines.  We then group by the headers and combine the blocks which follow the last reset for that block name.
 

@@ -112,37 +112,40 @@ class App
     end
     
     def read_file(file)
+      code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
       fin = File.open(file, 'r')
-      last_header = nil
-      fin.readlines
+      fin.readlines.each_with_index.map do |line, line_no_m_1|
+        line_no = line_no_m_1 + 1
+        [line, line_no]
+    end
     end
     
-    def include_includes(lines, current_file = @input, depth = 0)
+    def include_includes(contents, current_file = @input, depth = 0)
       raise "too many includes" if depth > 1000
       include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
-      lines.map do |line|
+      contents.map do |(line, line_no)|
         match = include_exp.match(line)
         if match
           file = File.dirname(current_file) + '/' + match[1]
           include_includes(read_file(file), file, depth + 1)
         else
-          [line]
+          [[line, line_no]]
         end
       end.flatten(1)
     end
     
-    def parse_blocks(lines)
+    def parse_blocks(contents)
       code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
       in_block = false
-      blocks = lines.find_all do |line|
+      blocks = contents.find_all do |(line, line_no)|
         in_block = !in_block if line =~ code_block_exp
         in_block
-      end.slice_before do |line|
+      end.slice_before do |(line, line_no)|
         code_block_exp =~ line
-      end.map do |(header, *rest)|
+      end.map do |((header, line_no), *rest)|
         white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
-        [name, replacement_mark, rest]
-      end.group_by do |(name, _, _)|
+        [name, replacement_mark, rest.map {|(l, _)| l}, line_no]
+      end.group_by do |(name, _, _, _)|
         name
       end.transform_values do |bodies|
         last_replacement_index = get_last_replacement_index(bodies)

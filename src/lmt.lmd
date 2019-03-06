@@ -277,13 +277,16 @@ end
 
 ### Reading The File
 
-This is fairly self explanatory, though note, we are storing the file in memory as an array of lines.
+This is fairly self explanatory, though note, we are storing the file in memory as an array of lines.  We are also going to add the line number to the list
 
 ``` ruby read_file
 def read_file(file)
+  code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
   fin = File.open(file, 'r')
-  last_header = nil
-  fin.readlines
+  fin.readlines.each_with_index.map do |line, line_no_m_1|
+    line_no = line_no_m_1 + 1
+    [line, line_no]
+  end
 end
 
 ```
@@ -293,16 +296,16 @@ end
 Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.
 
 ``` ruby include_includes
-def include_includes(lines, current_file = @input, depth = 0)
+def include_includes(contents, current_file = @input, depth = 0)
   raise "too many includes" if depth > 1000
   include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
-  lines.map do |line|
+  contents.map do |(line, line_no)|
     match = include_exp.match(line)
     if match
       file = File.dirname(current_file) + '/' + match[1]
       include_includes(read_file(file), file, depth + 1)
     else
-      [line]
+      [[line, line_no]]
     end
   end.flatten(1)
 end
@@ -320,18 +323,18 @@ We also need to remove the last newline from the block as it causes problems whe
 Finally, (after making sure we aren't missing a code fence) we extract the unnamed block from the hash and return both it and the rest.
 
 ``` ruby parse_blocks
-def parse_blocks(lines)
+def parse_blocks(contents)
   code_block_exp = /^([s]*)``` ?[\w]* ?(=?)([-\w]*)?/
   in_block = false
-  blocks = lines.find_all do |line|
+  blocks = contents.find_all do |(line, line_no)|
     in_block = !in_block if line =~ code_block_exp
     in_block
-  end.slice_before do |line|
+  end.slice_before do |(line, line_no)|
     code_block_exp =~ line
-  end.map do |(header, *rest)|
+  end.map do |((header, line_no), *rest)|
     white_space, replacement_mark, name = code_block_exp.match(header)[1..-1]
-    [name, replacement_mark, rest]
-  end.group_by do |(name, _, _)|
+    [name, replacement_mark, rest.map {|(l, _)| l}, line_no]
+  end.group_by do |(name, _, _, _)|
     name
   end.transform_values do |bodies|
     last_replacement_index = get_last_replacement_index(bodies)
@@ -620,5 +623,7 @@ If a block is unused, then don't break if it uses a nonexistent block.
 And with that, we have tangled a file.
 
 At current, there are a few more features that would be nice to have. First, this does not yet support extension by commands.  Second, we cannot write to any file other than the output file.  Third, we don't have many filters.  These features can wait for now.
+
+So, we have started threading source lines numbers through.  But the problem arises: what to do with this information?  How do we make it useful?  I have no answers for this yet, so the change will sit where it is, functionalish but useless.
 
 ∎

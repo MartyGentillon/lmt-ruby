@@ -27,6 +27,7 @@ There are also a few potentially useful features that are not implemented but mi
 
 1. The ability to extend the tangler with Ruby code from a block.
 2. The ability to write out other files.
+3. Source mapping
 
 Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
 

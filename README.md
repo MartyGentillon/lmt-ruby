@@ -42,10 +42,6 @@ Remember, this is a bundler app, and to rum it without installing, you must use 
 bundle exec ruby bin/lmt --file src/lmt.lmd --output bin/lmt
 ```
 
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/MartyGentillon/lmt-ruby.
-
 ## Prior Art
 
 Some related and similar tools that the reader might find interesting:
@@ -53,4 +49,11 @@ Some related and similar tools that the reader might find interesting:
 * <<https://github.com/driusan/lmt>>
 * <<https://github.com/rebcabin/tangledown>>
 * <<https://github.com/vlead/literate-tools>>
+* <<https://github.com/zyedidia/Literate>>
 * <<https://github.com/mqsoh/knot>>
+* <<https://fsprojects.github.io/FSharp.Formatting/sidemarkdown.html>>
+* <<https://github.com/richorama/literate>>
+
+## Contributing
+
+Bug reports and pull requests are welcome on GitHub at <<https://github.com/MartyGentillon/lmt-ruby>>.

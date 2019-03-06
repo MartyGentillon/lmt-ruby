@@ -1,10 +1,12 @@
 # Lmt
 
-Lmt is a literate markdown tangle program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
+Lmt is a literate markdown tangle and weave program for [literate programing](https://en.wikipedia.org/wiki/Literate_programming) in a slightly extended [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax that is written in Ruby.
 
 In literate programming, a program is contained within a prose essay describing the thinking which goes into the program.  The source code is then extracted from the essay using a program called tangle (this application).  The essay can also be formatted into a document for human consumption using a program called "weave".
 
-For a more detailed description and example, see the program in [src/lmt.md](./src/lmt.md).
+For a more detailed description and example, see the tangle program in [src/lmt.lmd](./src/lmt.lmd) and the weave program in [src/lmw.lmd](./src/lmw.lmd).
+
+The weaved output may be found in [doc/lmt.md](./doc/lmt.md) and [doc/lmw.md](./doc/lmw.md)
 
 ## Installation
 
@@ -24,10 +26,16 @@ Or install it yourself as:
 
 ## Usage
 
-The program takes input files and produces output files.  It is used as follows:
+The tangle program takes input files and produces tangled output files.  It is used as follows:
 
 ``` bash
 bin/lmt --file {input file} --output {tangled destination}
+```
+
+The weave program is similar but produces weaved output files.  It does not recurse down include statements, and so will need to be run independently for each included file.  An example usage:
+
+``` bash
+bin/lmw --file {input file} --output [weaved destination]
 ```
 
 ## Development
@@ -40,6 +48,12 @@ Remember, this is a bundler app, and to rum it without installing, you must use 
 
 ``` bash
 bundle exec ruby bin/lmt --file src/lmt.lmd --output bin/lmt
+```
+
+To test the weave you can use the following command which will weave the weaver and write it to the doc directory.
+
+``` bash
+bundle exec ruby bin/lmt --file src/lmt.lmd --output bin/lmt; bundle exec ruby bin/lmw --file src/lmw.lmd --output doc/lmw.md
 ```
 
 ## Prior Art

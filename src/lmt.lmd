@@ -32,11 +32,21 @@ There are also a few potentially useful features that are not implemented but mi
 
 Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
 
-### Macros
+### Blocks
 
 Markdown already supports code blocks expressed with code fences starting with three backticks, usually enabling syntax highlighting on the output.  This should work excellently for identifying block boundaries.
 
-In order to add the features we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For example
+There are two types of blocks: the default block and macro blocks.
+
+Ouput begins with the default block.  It is simply a markdown code block which has no macro name.  with no further information.  It looks like this.
+
+``` ruby
+#Output starts here
+```
+
+If there is no default block, then no output file will be created.
+
+In order to add the macro feature we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For example to create a macro named macro_description we could use:
 
 ```ruby macro_description
 # this shouldn't be in the output, it should have been replaced.
@@ -58,6 +68,8 @@ To append to a block, just open it again.  The macro expansion only happens afte
 # Yay appended code gets injected
 block_appendment = true
 ```
+
+#### Macros
 
 We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside `⦅⦆` refers to a block by name and should be replaced by the contents of that block.
 
@@ -146,9 +158,9 @@ required(:file, :output)
 
 ## Implementation and Example
 
-Now for an example in implementation.  Using Ruby we can write a template as below:
+Now for an example in implementation.  Using Ruby we can write a template as below:  (We are replacing the default block because the version above doesn't have a #!.)
 
-```ruby
+```ruby =
 #!/usr/bin/env ruby
 # Encoding: utf-8
 
@@ -265,14 +277,16 @@ end
 
 ### Tangle
 
-Now we have the basic tangle process wherein a file is read, includes are substituted, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.
+Now we have the basic tangle process wherein a file is read, includes are substituted, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.  If there is no default block, then there is no further work to be done.
 
 ``` ruby tangle
 def tangle()
   contents = include_includes(read_file(@input))
   @block, @blocks = parse_blocks(contents)
-  @block = expand_macros(@block)
-  @block = unescape_double_parens(@block)
+  if @block
+    @block = expand_macros(@block)
+    @block = unescape_double_parens(@block)
+  end
   @tangled = true
 end
 
@@ -469,13 +483,15 @@ end
 
 ### Write The Output
 
-Finally, write the output.
+Finally, if there is a default block, write the output.
 
 ``` ruby write
 def write(output)
-  fout = File.open(output, 'w')
   tangle() unless @tangled
-  @block.each {|line| fout << line}
+  if @block
+    fout = File.open(output, 'w')
+    @block.each {|line| fout << line}
+  end
 end
 
 ```

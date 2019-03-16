@@ -106,8 +106,10 @@ class App
     def tangle()
       contents = include_includes(read_file(@input))
       @block, @blocks = parse_blocks(contents)
-      @block = expand_macros(@block)
-      @block = unescape_double_parens(@block)
+      if @block
+        @block = expand_macros(@block)
+        @block = unescape_double_parens(@block)
+      end
       @tangled = true
     end
     
@@ -185,9 +187,11 @@ class App
     end
     
     def write(output)
-      fout = File.open(output, 'w')
       tangle() unless @tangled
-      @block.each {|line| fout << line}
+      if @block
+        fout = File.open(output, 'w')
+        @block.each {|line| fout << line}
+      end
     end
     
   

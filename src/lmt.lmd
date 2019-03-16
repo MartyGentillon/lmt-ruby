@@ -116,7 +116,7 @@ During tangle the link line will be replaced with the lines from the included fi
 included_string = "I am in lmt.lmd"
 ```
 
-! include [an include](lmt_incluce.lmd)
+! include [an include](lmt_include.lmd)
 
 ### Self Test
 

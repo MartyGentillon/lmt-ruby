@@ -136,7 +136,9 @@ There are a few built in filters:
 
 ``` ruby
 {
-  'ruby_escape' => ⦅ruby_escape⦆
+  'ruby_escape' => ⦅ruby_escape⦆,
+  'double_quote' => ⦅double_quote⦆,
+  'add_comma' => ⦅add_comma⦆
 }
 ```
 
@@ -611,7 +613,6 @@ def apply_filters(strings, filters)
 end
 ```
 
-
 ### Ruby Escape
 
 Ruby escape escapes strings appropriately for Ruby.  
@@ -621,6 +622,34 @@ Ruby escape escapes strings appropriately for Ruby.
 ``` ruby
 LineFilter.new do |line|
   line.dump[1..-2]
+end
+```
+
+### Double Quote
+
+Double quote surrounds strings in double quotes
+
+###### Code Block: Double Quote
+
+``` ruby
+LineFilter.new do |line|
+  before_white = /^\s*/.match(line)[0]
+  after_white = /\s*$/.match(line)[0]
+  "#{before_white}\"#{line.strip}\"#{after_white}"
+end
+```
+
+### Add Commas
+
+Add commas adds comma to the end of each line.
+
+###### Code Block: Add Comma
+
+``` ruby
+LineFilter.new do |line|
+  before_white = /^\s*/.match(line)[0]
+  after_white = /\s*$/.match(line)[0]
+  "#{before_white}#{line.strip},#{after_white}"
 end
 ```
 
@@ -694,11 +723,28 @@ foo
 
 At the [top of the file](Filters) we described the usage of filters.  Let's make sure that works.  The extra `.?` in the regular expression is a workaround for an editor bug in Visual Studio Code, where, apparently, `/\\/` escapes the `/` rather than the `\`.... annoying.
 
+###### Code Block: Some Text
+
+``` text
+some text
+```
+
+###### Code Block: A List
+
+``` text
+item 1
+item 2
+```
+
 ###### Code Block: Test Filters
 
 ``` ruby
 ⦅filter_use_description⦆
 report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
+some_text = ⦅some_text | double_quote⦆
+report_self_test_failure("Double quote doesn't double quote") unless some_text == "⦅some_text⦆"
+items = [⦅a_list | double_quote | add_comma⦆]
+report_self_test_failure("Add comma isn't adding commas") unless items == ["item 1", "item 2"]
 ```
 
 ### Testing: Inclusion

@@ -58,6 +58,11 @@ class Tangle
     report_self_test_failure("Should be able to place two macros on the same line") unless two_macros == "foo foo"
     string_with_backslash = "this string ends in \\."
     report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
+    some_text = "some text"
+    report_self_test_failure("Double quote doesn't double quote") unless some_text == "some text"
+    items = ["item 1",
+    "item 2",]
+    report_self_test_failure("Add comma isn't adding commas") unless items == ["item 1", "item 2"]
     included_string = "I came from lmt_include.lmd"
     report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
 
@@ -96,6 +101,16 @@ class Tangle
     @filters = {
       'ruby_escape' => LineFilter.new do |line|
         line.dump[1..-2]
+      end,
+      'double_quote' => LineFilter.new do |line|
+        before_white = /^\s*/.match(line)[0]
+        after_white = /\s*$/.match(line)[0]
+        "#{before_white}\"#{line.strip}\"#{after_white}"
+      end,
+      'add_comma' => LineFilter.new do |line|
+        before_white = /^\s*/.match(line)[0]
+        after_white = /\s*$/.match(line)[0]
+        "#{before_white}#{line.strip},#{after_white}"
       end
     }
   

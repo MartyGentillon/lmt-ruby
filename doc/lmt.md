@@ -266,6 +266,7 @@ Finally, we have the dependencies.  Optparse and methadone are used for cli argu
 ``` ruby
 require 'optparse'
 require 'methadone'
+require 'lmt/version'
 ```
 
 There, now we are done with the boilerplate. On to:

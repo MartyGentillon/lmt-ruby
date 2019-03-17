@@ -3,6 +3,7 @@
 
 require 'optparse'
 require 'methadone'
+require 'lmt/version'
 
 class App
   include Methadone::Main

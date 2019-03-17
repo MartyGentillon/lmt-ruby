@@ -138,7 +138,9 @@ There are a few built in filters:
 {
   'ruby_escape' => ⦅ruby_escape⦆,
   'double_quote' => ⦅double_quote⦆,
-  'add_comma' => ⦅add_comma⦆
+  'add_comma' => ⦅add_comma⦆,
+  'indent_continuation' => ⦅indent_continuation⦆,
+  'indent_lines' => ⦅indent_lines⦆
 }
 ```
 
@@ -653,6 +655,30 @@ LineFilter.new do |line|
 end
 ```
 
+### Indent continuation
+
+Adds two spaces to the front of each line after the first
+
+###### Code Block: Indent Continuation
+
+``` ruby
+Filter.new do |lines|
+  [lines[0], *lines[1..-1].map {|l| "  #{l}"}]
+end
+```
+
+### Indent Lines
+
+Adds two spaces to the front of each line
+
+###### Code Block: Indent Lines
+
+``` ruby
+LineFilter.new do |line|
+  "  #{line}"
+end
+```
+
 ## Option Verification
 
 Option verification is described here:
@@ -743,7 +769,9 @@ item 2
 report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
 some_text = ⦅some_text | double_quote⦆
 report_self_test_failure("Double quote doesn't double quote") unless some_text == "⦅some_text⦆"
-items = [⦅a_list | double_quote | add_comma⦆]
+some_indented_text = "⦅some_text | indent_lines⦆"
+report_self_test_failure("Indent lines should add two spaces to lines") unless some_indented_text == "  ⦅some_text⦆"
+items = [⦅a_list | double_quote | add_comma | indent_continuation⦆]
 report_self_test_failure("Add comma isn't adding commas") unless items == ["item 1", "item 2"]
 ```
 

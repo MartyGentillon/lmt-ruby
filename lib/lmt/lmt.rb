@@ -60,8 +60,10 @@ class Tangle
     report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
     some_text = "some text"
     report_self_test_failure("Double quote doesn't double quote") unless some_text == "some text"
+    some_indented_text = "  some text"
+    report_self_test_failure("Indent lines should add two spaces to lines") unless some_indented_text == "  some text"
     items = ["item 1",
-    "item 2",]
+      "item 2",]
     report_self_test_failure("Add comma isn't adding commas") unless items == ["item 1", "item 2"]
     included_string = "I came from lmt_include.lmd"
     report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
@@ -111,6 +113,12 @@ class Tangle
         before_white = /^\s*/.match(line)[0]
         after_white = /\s*$/.match(line)[0]
         "#{before_white}#{line.strip},#{after_white}"
+      end,
+      'indent_continuation' => Filter.new do |lines|
+        [lines[0], *lines[1..-1].map {|l| "  #{l}"}]
+      end,
+      'indent_lines' => LineFilter.new do |line|
+        "  #{line}"
       end
     }
   

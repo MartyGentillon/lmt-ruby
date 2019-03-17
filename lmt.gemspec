@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.license       = "MIT"
   spec.version       = Lmt::VERSION
   spec.authors       = ["Marty Gentillon"]
-  spec.email         = ["marty.gentillon+rubygems@gmail.com"]
+  spec.email         = ["marty.gentillon+lmt-ruby@gmail.com"]
 
   spec.summary       = %q{A literate tangler written in Ruby for use with MarkDown.}
   spec.description   = %q{A literate tangler written in Ruby for use with MarkDown.}

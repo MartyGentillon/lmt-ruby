@@ -2,17 +2,22 @@
 # Encoding: utf-8
 
 require "bundler/setup"
-require "lmt"
+require "lmt/lmt"
+require "lmt/lmw"
 load File.expand_path(File.dirname(__FILE__) + '/lmt')
 
 # You can add fixtures and/or initialization code here to make experimenting
 # with your gem easier. You can also use a different console, if you like.
 tangle = nil
+weave = nil
 
 def make_tangle()
-  tangle = App::Tangler.new("src/lmt.lmd")
+  tangle = Lmt::Tangle::Tangler.new("src/lmt/lmt.rb.lmd")
 end
 
+def make_weave()
+  weave = Lmt::Lmw::Weave.from_file("src/lmt/lmw.rb.lmd")
+end
 
 # (If you use this, don't forget to add pry to your Gemfile!)
 require "pry"

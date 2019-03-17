@@ -38,12 +38,13 @@ Bundler::GemHelper.install_tasks
 
 task :test => :build
 task :release => :test
+task :install => :build
 
 task :build => :tangle
 task :build => :weave
 
-lmd_files = Rake::FileList['src/*.lmd']
-outputs = lmd_files.pathmap('%{^src,bin}X')
+lmd_files = Rake::FileList['src/**/*.lmd']
+outputs = lmd_files.pathmap('%{^src,lib}X')
 docs = lmd_files.pathmap('%{^src,doc}X.md')
 
 task :tangle => outputs

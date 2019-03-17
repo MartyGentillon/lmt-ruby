@@ -1,6 +1,8 @@
 # Lmt-Ruby
 
-``` text description
+###### Code Block: Description
+
+``` text
 A literate Markdown tangle tool written in Ruby.
 ```
 
@@ -40,6 +42,8 @@ There are two types of blocks: the default block and macro blocks.
 
 Ouput begins with the default block.  It is simply a markdown code block which has no macro name.  with no further information.  It looks like this.
 
+###### Output Block
+
 ``` ruby
 #Output starts here
 ```
@@ -48,7 +52,9 @@ If there is no default block, then no output file will be created.
 
 In order to add the macro feature we need, we will need to add header content at the beginning of such a quote. For code blocks, we can add it after the language name.  For example to create a macro named macro_description we could use:
 
-```ruby macro_description
+###### Code Block: Macro Description
+
+``` ruby
 # this shouldn't be in the output, it should have been replaced.
 block_replacement = false
 ```
@@ -57,14 +63,18 @@ Of course, these do not play well with Markdown rendering, so we will need a wea
 
 To replace a block put `=` before the block name like so:
 
-```ruby =macro_description
+###### Replacing Code Block: Macro Description
+
+``` ruby
 # this is the replacement
 replaced_block = true
 ```
 
 To append to a block, just open it again.  The macro expansion only happens after the entire file is read.
 
-```ruby macro_description
+###### Code Block: Macro Description
+
+``` ruby
 # Yay appended code gets injected
 block_appendment = true
 ```
@@ -73,7 +83,9 @@ block_appendment = true
 
 We will also need a way to trigger macro insertion.  Given that unicode tends not to be in use, why don't we say that anything inside `⦅⦆` refers to a block by name and should be replaced by the contents of that block.
 
-```ruby macro_insertion_description
+###### Code Block: Macro Insertion Description
+
+``` ruby
 block_replacement = true
 replaced_block = false
 block_appendment = false
@@ -85,14 +97,18 @@ Given the definition of `macro_description` above, all the variables will be tru
 
 This also works with spaces inside the `⦅⦆`
 
-``` ruby macro_insertion_description
+###### Code Block: Macro Insertion Description
+
+``` ruby
 insertion_works_with_spaces = false
 ⦅ insertion_works_with_spaces ⦆
 ```
 
 Finally, if substitution isn't desired, you may escape the `⦅` and `⦆` with `\` which will prevent macro expansion.  As below; the first character of escaped string is `⦅`
 
-``` ruby macro_insertion_description
+###### Code Block: Macro Insertion Description
+
+``` ruby
 escaped_string = '\⦅macro_description\⦆'
 ```
 
@@ -100,19 +116,25 @@ escaped_string = '\⦅macro_description\⦆'
 
 Filters can be defined as functions which take an array of lines and return the altered array.  They are applied after a macro's contents are expanded and before it is inserted.  They are triggered with the `|` symbol in expansion. for example: given
 
-``` text string_with_backslash
+###### Code Block: String With Backslash
+
+``` text
 this string ends in \.
 ```
 
 The following will escape the `\`
 
-``` ruby filter_use_description
+###### Code Block: Filter Use Description
+
+``` ruby
 string_with_backslash = "⦅string_with_backslash | ruby_escape⦆"
 ```
 
 There are a few built in filters:
 
-``` ruby filter_list
+###### Code Block: Filter List
+
+``` ruby
 {
   'ruby_escape' => ⦅ruby_escape⦆
 }
@@ -124,17 +146,21 @@ Other files may be using an include directive and a markdown link.  Include dire
 
 During tangle the link line will be replaced with the lines from the included file.  This means that they may replace blocks defined in the file that includes them such as this one
 
-``` ruby included_block
+###### Code Block: Included Block
+
+``` ruby
 included_string = "I am in lmt.lmd"
 ```
 
-! include [an include](lmt_include.lmd)
+**See include:** [lmt_include.lmd](include_file)
 
 ### Self Test
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
 
-``` ruby self_test
+###### Code Block: Self Test
+
+``` ruby
 def self.self_test()
   ⦅test_description⦆
 end
@@ -144,7 +170,9 @@ end
 
 We need to know where to get the input from and where to send the output to.  For that, we will use the following command line options
 
-``` ruby options
+###### Code Block: Options
+
+``` ruby
 on("--file FILE", "-f", "Required: input file")
 on("--output FILE", "-o", "Required: output file")
 on("--dev", "disables self test failure for development")
@@ -152,7 +180,9 @@ on("--dev", "disables self test failure for development")
 
 Of which, both are required
 
-``` ruby options
+###### Code Block: Options
+
+``` ruby
 required(:file, :output)
 ```
 
@@ -160,17 +190,21 @@ required(:file, :output)
 
 Now for an example in implementation.  Using Ruby we can write a template as below:  (We are replacing the default block because the version above doesn't have a #!.)
 
-```ruby =
+###### Replacing Output Block
+
+``` ruby
 #!/usr/bin/env ruby
 # Encoding: utf-8
 
 ⦅includes⦆
 
-class App
+module Lmt
+
+class Tangle
   include Methadone::Main
   include Methadone::CLILogging
 
-  @dev = true
+  @dev = false
 
   main do
     check_arguments()
@@ -212,22 +246,28 @@ class App
   go! if __FILE__ == $0
 end
 
+end
+
 ```
 
 This is a basic template using the [Ruby methadone](https://github.com/davetron5000/methadone) command line application framework and making sure that we report errors (because silent failure sucks).
 
 The main body will first test itself then, invoke the library component, which isn't in lib as traditional because it is in this file and I don't want to move it around.
 
-``` ruby main_body
+###### Code Block: Main Body
+
+``` ruby
 self_test()
-tangler = App::Tangler.new(options[:file])
+tangler = Tangle::Tangler.new(options[:file])
 tangler.tangle()
 tangler.write(options[:output])
 ```
 
 Finally, we have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.
 
-``` ruby includes
+###### Code Block: Includes
+
+``` ruby
 require 'optparse'
 require 'methadone'
 require 'lmt/version'
@@ -239,7 +279,9 @@ There, now we are done with the boilerplate. On to:
 
 The tangler is defined within a class that contains the tangling implementation.  It contains the following blocks
 
-``` ruby tangle_class
+###### Code Block: Tangle Class
+
+``` ruby
 class Tangler
   class << self
     attr_reader :filters
@@ -266,7 +308,9 @@ end
 
 The initializer takes in the input file and sets up our state.  We are keeping the unnamed top level block separate from the rest.  Then we have a hash of blocks.  Finally, we need to make sure we have tangled before we write the output.
 
-``` ruby initializer
+###### Code Block: Initializer
+
+``` ruby
 def initialize(input)
   @input = input
   @block = ""
@@ -280,7 +324,9 @@ end
 
 Now we have the basic tangle process wherein a file is read, includes are substituted, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.  If there is no default block, then there is no further work to be done.
 
-``` ruby tangle
+###### Code Block: Tangle
+
+``` ruby
 def tangle()
   contents = include_includes(read_file(@input))
   @block, @blocks = parse_blocks(contents)
@@ -297,7 +343,9 @@ end
 
 This is fairly self explanatory, though note, we are storing the file in memory as an array of lines.
 
-``` ruby read_file
+###### Code Block: Read File
+
+``` ruby
 def read_file(file)
   File.open(file, 'r') do |f|
     f.readlines
@@ -310,11 +358,13 @@ end
 
 As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  Those expressions are detailed in:
 
-! include [here](lmt_expressions.lmd)  
+**See include:** [lmt_expressions.lmd](include_file)
 
 Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.
 
-``` ruby include_includes
+###### Code Block: Include Includes
+
+``` ruby
 def include_includes(lines, current_file = @input, depth = 0)
   raise "too many includes" if depth > 1000
   include_exp = ⦅include_expression⦆
@@ -341,7 +391,9 @@ We also need to remove the last newline from the block as it causes problems whe
 
 Finally, (after making sure we aren't missing a code fence) we extract the unnamed block from the hash and return both it and the rest.
 
-``` ruby parse_blocks
+###### Code Block: Parse Blocks
+
+``` ruby
 def parse_blocks(lines)
   code_block_exp = ⦅code_block_expression⦆
   in_block = false
@@ -373,7 +425,9 @@ end
 
 We have a private helper helper method here.  So, after we turn each block chunk into an array of `[name, replacement_mark, body]` we can find the last one by scanning for a replacement mark set to `=`.  Otherwise the answer is `0` as there is no replacement index.
 
-``` ruby tangle_class_privates
+###### Code Block: Tangle Class Privates
+
+``` ruby
 def get_last_replacement_index(bodies)
   last_replacement = bodies.each_with_index
       .select do |((_, replacement_mark, _), _)|
@@ -394,7 +448,9 @@ The other half of the meat.  Here we use two regular expressions.  One to identi
 
 This is implemented by splitting the line on the replacement section, grouping into pairs, and then reducing.  Afterwords, we end up with an extra layer of lists which need to be flattened.  (Yes I am using a monad and bind.)
 
-``` ruby expand_macros
+###### Code Block: Expand Macros
+
+``` ruby
 def expand_macros(lines, depth = 0)
   throw "too deep macro expansion {depth}" if depth > 1000
   lines.map do |line|
@@ -412,7 +468,9 @@ Expand_macro_on_line turns a line into a list of lines.  The collected results w
 
 First we process the white space off the front of the expression.  This will be added to each line in the extended macros so that the output file is nicely indented.  It also means that indentation sensitive languages like python will be tangled correctly.
 
-``` ruby tangle_class_privates
+###### Code Block: Tangle Class Privates
+
+``` ruby
 def expand_macro_on_line(line, depth)
   white_space_exp = /^(\s*)(.*\n?)/
   macro_substitution_exp = ⦅macro_substitution_expression⦆
@@ -422,7 +480,9 @@ def expand_macro_on_line(line, depth)
 
 Then we chop it into pieces using the [macro substitution expression](lmt_expressions.lmd#The-Macro-Substitution-Expression) This results in text, macro_name / filter pairs.  If there is a macro name, we then split the filter names off with the filter expression which provides filter names followed by stuff between them (nothing) which we discard.
 
-``` ruby tangle_class_privates
+###### Code Block: Tangle Class Privates
+
+``` ruby
   section = text.split(macro_substitution_exp)
       .each_slice(2)
       .map do |(text_before_macro, macro_match)|
@@ -436,7 +496,9 @@ Then we chop it into pieces using the [macro substitution expression](lmt_expres
 
 Finally, we are ready to actually process the text and macros.  We build the list of ines with just the white space, and appending the results of precessing to the end.  Each potential line is built up by appending to the end of the last line.  If there is no macro, then we can just append the text.  
 
-``` ruby tangle_class_privates
+###### Code Block: Tangle Class Privates
+
+``` ruby
       end.inject([white_space]) do
         |(*new_lines, last_line), (text_before_macro, macro_name, filters)|
         if macro_name.nil?
@@ -447,7 +509,9 @@ Finally, we are ready to actually process the text and macros.  We build the lis
 
 If there is a macro substitution, first we get the new lines.  The we append the first line of the macro text to the last line.  Finally, we append the white space to the front of each of the macro's lines and insert them into the middle.  of the list of lines we are building.
 
-``` ruby tangle_class_privates
+###### Code Block: Tangle Class Privates
+
+``` ruby
           throw "Macro '#{macro_name}' unknown" unless @blocks[macro_name]
           macro_lines = apply_filters(
               expand_macros(@blocks[macro_name], depth + 1), filters)
@@ -471,7 +535,9 @@ Finally, throughout this process, we have to be ware that a macro may have no co
 
 This is fairly self explanatory, gsub is global substitution.  We need three `\`s two to match the escape sequence for `\` in ruby and a third to handle the escaped `⦅` and `⦆` when this file itself is tangled.
 
-``` ruby unescape_double_parens
+###### Code Block: Unescape Double Parens
+
+``` ruby
 def unescape_double_parens(block)
   block.map do |l|
     l = l.gsub("\\\⦅", "⦅")
@@ -486,7 +552,9 @@ end
 
 Finally, if there is a default block, write the output.
 
-``` ruby write
+###### Code Block: Write
+
+``` ruby
 def write(output)
   tangle() unless @tangled
   if @block
@@ -501,7 +569,9 @@ end
 
 The filters are instances of the Filter class which can be created by passing a block to the initializer of the class.  When the filter is executed, this block of code will be called on all of the lines of code being filtered.
 
-``` ruby filter_class
+###### Code Block: Filter Class
+
+``` ruby
 class Filter
   def initialize(&block)
     @code = block;
@@ -515,7 +585,9 @@ end
 
 Because it is fairly common to filter lines one at a time, LineFilter will pass in each line instead of the whole block.
 
-``` ruby filter_class
+###### Code Block: Filter Class
+
+``` ruby
 class LineFilter < Filter
   def filter(lines)
     lines.map do |line|
@@ -527,7 +599,9 @@ end
 
 Filters are applied by the following method:
 
-``` ruby apply_filters
+###### Code Block: Apply Filters
+
+``` ruby
 def apply_filters(strings, filters)
   filters.map do |filter_name|
     Tangler.filters[filter_name]
@@ -542,7 +616,9 @@ end
 
 Ruby escape escapes strings appropriately for Ruby.  
 
-``` ruby ruby_escape
+###### Code Block: Ruby Escape
+
+``` ruby
 LineFilter.new do |line|
   line.dump[1..-2]
 end
@@ -552,7 +628,7 @@ end
 
 Option verification is described here:
 
-! include [Option verification](option_verification.lmd)
+**See include:** [option_verification.lmd](include_file)
 
 ## Self Test, Details
 
@@ -560,11 +636,13 @@ So, now we need to go into details of our self test and also include regressions
 
 First, we need a method to report test failures:
 
-! include [Error reporting](error_reporting.lmd)
+**See include:** [error_reporting.lmd](include_file)
 
 Then we need the tests we are doing.  The intentionally empty block is included both at the beginning and end to make sure that we handled all the edge cases related to empty blocks appropriately.
 
-``` ruby test_description
+###### Code Block: Test Description
+
+``` ruby
 ⦅intentionally_empty_block⦆
 ⦅test_macro_insertion_description⦆
 ⦅test_filters⦆
@@ -576,7 +654,9 @@ Then we need the tests we are doing.  The intentionally empty block is included 
 
 At [the top of the file](#Macros), we described the macros.  Lets make sure that works by ensuring the variables are as they were described above
 
-``` ruby test_macro_insertion_description
+###### Code Block: Test Macro Insertion Description
+
+``` ruby
 ⦅macro_insertion_description⦆
 # These require the code in the macro to work.
 report_self_test_failure("block replacement doesn't work") unless block_replacement and replaced_block
@@ -587,20 +667,26 @@ report_self_test_failure("double parentheses may be escaped") unless escaped_str
 
 Finally, we need to make sure two macros on the same line works.
 
-``` ruby test_macro_insertion_description
+###### Code Block: Test Macro Insertion Description
+
+``` ruby
 two_macros = "⦅foo⦆ ⦅foo⦆"
 report_self_test_failure("Should be able to place two macros on the same line") unless two_macros == "foo foo"
 ```
 
 For that to work we need:
 
-``` ruby insertion_works_with_spaces
+###### Code Block: Insertion Works With Spaces
+
+``` ruby
 insertion_works_with_spaces = true
 ```
 
 and
 
-``` ruby foo
+###### Code Block: Foo
+
+``` ruby
 foo
 ```
 
@@ -608,14 +694,18 @@ foo
 
 At the [top of the file](Filters) we described the usage of filters.  Let's make sure that works.  The extra `.?` in the regular expression is a workaround for an editor bug in Visual Studio Code, where, apparently, `/\\/` escapes the `/` rather than the `\`.... annoying.
 
-``` ruby test_filters
+###### Code Block: Test Filters
+
+``` ruby
 ⦅filter_use_description⦆
 report_self_test_failure("ruby escape doesn't escape backslash") unless string_with_backslash =~ /\\.?/
 ```
 
 ### Testing: Inclusion
 
-``` ruby test_inclusion
+###### Code Block: Test Inclusion
+
+``` ruby
 ⦅included_block⦆
 report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
 ```
@@ -628,14 +718,18 @@ Some regressions / edge cases that we need to watch for.  These should not break
 
 We need to be able to tangle empty blocks such as:
 
-``` ruby intentionally_empty_block
+###### Code Block: Intentionally Empty Block
+
+``` ruby
 ```
 
 #### Unused blocks referencing nonexistent blocks
 
 If a block is unused, then don't break if it uses a nonexistent block.
 
-``` ruby unused_block
+###### Code Block: Unused Block
+
+``` ruby
 ⦅this_block_does_not_exist⦆
 ```
 

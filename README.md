@@ -47,13 +47,13 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 Remember, this is a bundler app, and to rum it without installing, you must use the `bundle exec` command. As an example, the self-tangling command for development is:
 
 ``` bash
-bundle exec ruby bin/lmt --file src/lmt.lmd --output bin/lmt
+bundle exec ruby bin/lmt --file src/lmt/lmt.rb.lmd --output lib/lmt/lmt.rb
 ```
 
 To test the weave you can use the following command which will weave the weaver and write it to the doc directory.
 
 ``` bash
-bundle exec ruby bin/lmt --file src/lmt.lmd --output bin/lmt; bundle exec ruby bin/lmw --file src/lmw.lmd --output doc/lmw.md
+bundle exec ruby bin/lmt --file src/lmt/lmt.rb.lmd --output lib/lmt/lmt.rb; bundle exec ruby bin/lmw --file src/lmt/lmw.rb.lmd --output doc/lmt/lmw.rb.md
 ```
 
 ## Prior Art

@@ -58,7 +58,9 @@ Now for an example in implementation.  Using Ruby we can write a template as bel
 
 ⦅includes⦆
 
-class App
+module Lmt
+
+class Lmw
   include Methadone::Main
   include Methadone::CLILogging
 
@@ -102,6 +104,7 @@ class App
   go! if __FILE__ == $0
 end
 
+end
 ```
 
 This is a basic template using the [Ruby methadone](https://github.com/davetron5000/methadone) command line application framework and making sure that we report errors (because silent failure sucks).
@@ -112,7 +115,7 @@ The main body will first test itself then, invoke the library component, which i
 
 ``` ruby
 self_test()
-weave = App::Weave.from_file(options[:file])
+weave = Lmw::Weave.from_file(options[:file])
 weave.weave()
 weave.write(options[:output])
 ```

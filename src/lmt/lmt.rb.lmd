@@ -30,8 +30,6 @@ There are also a few potentially useful features that are not implemented but mi
 3. Source mapping
 4. Further source verification.  For instance, all instances of the same block should be in the same language.  Also, detect and prevent double inclusion.
 
-Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
-
 ### Blocks
 
 Markdown already supports code blocks expressed with code fences starting with three backticks, usually enabling syntax highlighting on the output.  This should work excellently for identifying block boundaries.

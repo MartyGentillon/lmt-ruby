@@ -36,12 +36,35 @@ include Rake::DSL
 Bundler::GemHelper.install_tasks
 
 
+task :test => :build
+task :release => :test
+
+task :build => :tangle
+task :build => :weave
+
+lmd_files = Rake::FileList['src/*.lmd']
+outputs = lmd_files.pathmap('%{^src,bin}X')
+docs = lmd_files.pathmap('%{^src,doc}X.md')
+
+task :tangle => outputs
+task :weave => docs
+
+lmd_files.zip(outputs, docs).each do |lmd_file, output, doc|
+  directory output_dir = output.pathmap('%d')
+  directory doc_dir = doc.pathmap('%d')
+  file output => [output_dir, lmd_file] do
+    sh "ruby bin/lmt --file #{lmd_file} --output #{output}"
+  end
+  file doc => [doc_dir, lmd_file] do
+    sh "ruby bin/lmw --file #{lmd_file} --output #{doc}"
+  end
+end
+
 Rake::TestTask.new do |t|
   t.pattern = 'test/tc_*.rb'
 end
 
 Rake::RDocTask.new do |rd|
-  
   rd.main = "README.rdoc"
   
   rd.rdoc_files.include("README.rdoc","lib/**/*.rb","bin/**/*")

@@ -36,7 +36,7 @@ Markdown already supports code blocks expressed with code fences starting with t
 
 There are two types of blocks: the default block and macro blocks.
 
-Ouput begins with the default block.  It is simply a markdown code block which has no macro name.  with no further information.  It looks like this.
+Output begins with the default block.  It is simply a markdown code block which has no macro name.  with no further information.  It looks like this.
 
 ``` ruby
 #Output starts here

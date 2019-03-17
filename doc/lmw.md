@@ -24,7 +24,7 @@ A few nice to have features:
 
 Ideally, any links between and to blocks would also go to included files.
 
-Currently, it puts headers on blocks, and replaces include directives with a more human version.
+Currently, it puts headers on blocks, and replaces include directives with a more human version.  We still need to handle the parts and linking.  We also need to handle the link updating.
 
 ## Interface
 

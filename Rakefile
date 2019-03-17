@@ -42,6 +42,7 @@ task :install => :build
 
 task :build => :tangle
 task :build => :weave
+task :weave => :tangle
 
 lmd_files = Rake::FileList['src/**/*.lmd']
 outputs = lmd_files.pathmap('%{^src,lib}X')

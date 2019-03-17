@@ -29,13 +29,13 @@ Or install it yourself as:
 The tangle program takes input files and produces tangled output files.  It is used as follows:
 
 ``` bash
-bin/lmt --file {input file} --output {tangled destination}
+lmt --file {input file} --output {tangled destination}
 ```
 
 The weave program is similar but produces weaved output files.  It does not recurse down include statements, and so will need to be run independently for each included file.  An example usage:
 
 ``` bash
-bin/lmw --file {input file} --output [weaved destination]
+lmw --file {input file} --output [weaved destination]
 ```
 
 ## Development
@@ -54,6 +54,12 @@ To test the weave you can use the following command which will weave the weaver 
 
 ``` bash
 bundle exec ruby bin/lmt --file src/lmt/lmt.rb.lmd --output lib/lmt/lmt.rb; bundle exec ruby bin/lmw --file src/lmt/lmw.rb.lmd --output doc/lmt/lmw.rb.md
+```
+
+Since this is a self-bootstraping program, it is both tested and built by running itself on itself.  This means that if you add a bug, it won't run.  To fix this, check out the most recent version of the output file out of git.
+
+``` bash
+git co -- src/lmt/lmt.rb
 ```
 
 ## Prior Art

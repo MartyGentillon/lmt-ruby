@@ -68,7 +68,10 @@ class Tangle
     report_self_test_failure("Add comma isn't adding commas") unless items == ["item 1", "item 2"]
     included_string = "I came from lmt_include.lmd"
     report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
+    
+    from_extension = true
 
+    report_self_test_failure("extension hook should be able to add blocks") unless from_extension
   end
 
   def self.report_self_test_failure(message)
@@ -97,33 +100,29 @@ class Tangle
   end
 
   class Tangler
-    class << self
-      attr_reader :filters
-    end
-  
-    @filters = {
-      'ruby_escape' => LineFilter.new do |line|
-        line.dump[1..-2]
-      end,
-      'double_quote' => LineFilter.new do |line|
-        before_white = /^\s*/.match(line)[0]
-        after_white = /\s*$/.match(line)[0]
-        "#{before_white}\"#{line.strip}\"#{after_white}"
-      end,
-      'add_comma' => LineFilter.new do |line|
-        before_white = /^\s*/.match(line)[0]
-        after_white = /\s*$/.match(line)[0]
-        "#{before_white}#{line.strip},#{after_white}"
-      end,
-      'indent_continuation' => Filter.new do |lines|
-        [lines[0], *lines[1..-1].map {|l| "  #{l}"}]
-      end,
-      'indent_lines' => LineFilter.new do |line|
-        "  #{line}"
-      end
-    }
-  
     def initialize(input)
+      @extension_context = Context.new()
+      @extension_context.filters = {
+        'ruby_escape' => LineFilter.new do |line|
+          line.dump[1..-2]
+        end,
+        'double_quote' => LineFilter.new do |line|
+          before_white = /^\s*/.match(line)[0]
+          after_white = /\s*$/.match(line)[0]
+          "#{before_white}\"#{line.strip}\"#{after_white}"
+        end,
+        'add_comma' => LineFilter.new do |line|
+          before_white = /^\s*/.match(line)[0]
+          after_white = /\s*$/.match(line)[0]
+          "#{before_white}#{line.strip},#{after_white}"
+        end,
+        'indent_continuation' => Filter.new do |lines|
+          [lines[0], *lines[1..-1].map {|l| "  #{l}"}]
+        end,
+        'indent_lines' => LineFilter.new do |line|
+          "  #{line}"
+        end
+      }
       @input = input
       @block = ""
       @blocks = {}
@@ -131,8 +130,9 @@ class Tangle
     end
     
     def tangle()
-      contents = include_includes(read_file(@input))
-      @block, @blocks = parse_blocks(contents)
+      contents = eval_and_remove_extensions(
+          include_includes(read_file(@input)))
+      @block, @blocks = @extension_context.parse_hook(*parse_blocks(contents))
       if @block
         @block = expand_macros(@block)
         @block = unescape_double_parens(@block)
@@ -158,6 +158,31 @@ class Tangle
           [line]
         end
       end.flatten(1)
+    end
+    
+    def eval_and_remove_extensions(lines)
+      extension_expression = /^([s]*)``` ruby !/
+      extension_exit_expression = /```/
+      in_extension_block = false
+    
+      extension_lines, other_lines = lines.partition do |line|
+        unless in_extension_block
+          in_extension_block = line =~ extension_expression
+        else
+          in_extension_block = !(line =~ extension_exit_expression)
+          true
+        end
+      end
+    
+      e = extension_lines.slice_before do |line|
+        extension_expression =~ line
+      end.map do |block|
+        block[1..-2].join
+      end.each do |block|
+        @extension_context.get_binding.eval(block)
+      end
+    
+      other_lines
     end
     
     def parse_blocks(lines)
@@ -200,7 +225,7 @@ class Tangle
     
     def apply_filters(strings, filters)
       filters.map do |filter_name|
-        Tangler.filters[filter_name]
+        filters_map[filter_name]
       end.inject(strings) do |strings, filter|
         filter.filter(strings)
       end
@@ -223,6 +248,9 @@ class Tangle
     
   
     private
+    def filters_map
+      @extension_context.filters
+    end
     def get_last_replacement_index(bodies)
       last_replacement = bodies.each_with_index
           .select do |((_, replacement_mark, _), _)|
@@ -271,6 +299,19 @@ class Tangle
           end
     end
   end
+
+  class Context
+    attr_accessor :filters
+  
+    def get_binding
+      binding
+    end
+  
+    def parse_hook(main_block, blocks)
+      [main_block, blocks]
+    end
+  end
+  
 
   def self.required(*options)
     @required_options = options

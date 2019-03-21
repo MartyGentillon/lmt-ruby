@@ -24,15 +24,14 @@ In order to be useful for literate programming we need a few features:
 4. The ability to to identify code blocks which will be expanded when referenced
 5. The ability to append to or replace code blocks
 6. The ability to include another file.
+7. The ability to extend the tangler with Ruby code from a block.
 
 There are also a few potentially useful features that are not implemented but might be in the future:
 
-1. The ability to extend the tangler with Ruby code from a block.
-2. The ability to write out other files.
-3. Source mapping
-4. Further source verification.  For instance, all instances of the same block should be in the same language.  Also, detect and prevent double inclusion.
-
-Also, the only filter currently existing just escapes strings for ruby code.  There are many more that could be useful.
+1. The ability to write out other files.
+2. Source mapping
+3. Further source verification.  For instance, all instances of the same block should be in the same language.  Also, detect and prevent double inclusion.
+4. Simple variables and conditional logic to enable output only under certain circumstances
 
 ### Blocks
 
@@ -40,7 +39,7 @@ Markdown already supports code blocks expressed with code fences starting with t
 
 There are two types of blocks: the default block and macro blocks.
 
-Ouput begins with the default block.  It is simply a markdown code block which has no macro name.  with no further information.  It looks like this.
+Output begins with the default block.  It is simply a markdown code block which has no macro name.  with no further information.  It looks like this.
 
 ###### Output Block
 
@@ -158,6 +157,21 @@ included_string = "I am in lmt.lmd"
 
 **See include:** [lmt_include.lmd](include_file)
 
+### Extension
+
+In order to extend the tangler, it must be possible to mark a block for evaluation.  To do so we will extend the mechanism to indicate replacement.  Let's use `!`.  A block simply named `!` will just be executed within a contained scope.  Within this scope, it will be possible to access the map of filters through the `@filters` variable.  All of these blocks are executed and removed from the stream before any further processing is done.
+
+However, after blocks have been parsed, the map of blocks will be passed to the `parse_hook` method which an extension may define.  It will be passed a two arguments.  The first is an array with the lines of the main block, the second is a map of block name to line arrays.  It is expected to return the same datastructure in a two value array.  An example parse hook which adds a block to the list of know blocks follows:
+
+###### Output Block
+
+``` ruby
+def parse_hook(main_block, blocks)
+  blocks["from_extension"] = ["from_extension = true\n"]
+  [main_block, blocks]
+end
+```
+
 ### Self Test
 
 Of course, we will also need a testing procedure.  Since this is written as a literate program, our test procedure is: can we tangle ourself.  If the output of the tangler run on this file can tangle this file, then we know that the tangler works.
@@ -238,6 +252,8 @@ class Tangle
 
   ⦅tangle_class⦆
 
+  ⦅context_class⦆
+
   ⦅option_verification⦆
 
   description "⦅description⦆"
@@ -288,16 +304,11 @@ The tangler is defined within a class that contains the tangling implementation.
 
 ``` ruby
 class Tangler
-  class << self
-    attr_reader :filters
-  end
-
-  @filters = ⦅filter_list⦆
-
   ⦅initializer⦆
   ⦅tangle⦆
   ⦅read_file⦆
   ⦅include_includes⦆
+  ⦅eval_extensions⦆
   ⦅parse_blocks⦆
   ⦅expand_macros⦆
   ⦅apply_filters⦆
@@ -305,6 +316,9 @@ class Tangler
   ⦅write⦆
 
   private
+  def filters_map
+    @extension_context.filters
+  end
   ⦅tangle_class_privates⦆
 end
 ```
@@ -317,6 +331,8 @@ The initializer takes in the input file and sets up our state.  We are keeping t
 
 ``` ruby
 def initialize(input)
+  @extension_context = Context.new()
+  @extension_context.filters = ⦅filter_list⦆
   @input = input
   @block = ""
   @blocks = {}
@@ -327,14 +343,15 @@ end
 
 ### Tangle
 
-Now we have the basic tangle process wherein a file is read, includes are substituted, the blocks extracted, macros expanded recursively, and escaped double parentheses unescaped.  If there is no default block, then there is no further work to be done.
+Now we have the basic tangle process wherein a file is read, includes are substituted, extensions processed, the blocks extracted, the extension hook called, macros expanded recursively, and escaped double parentheses unescaped.  If there is no default block, then there is no further work to be done.
 
 ###### Code Block: Tangle
 
 ``` ruby
 def tangle()
-  contents = include_includes(read_file(@input))
-  @block, @blocks = parse_blocks(contents)
+  contents = eval_and_remove_extensions(
+      include_includes(read_file(@input)))
+  @block, @blocks = @extension_context.parse_hook(*parse_blocks(contents))
   if @block
     @block = expand_macros(@block)
     @block = unescape_double_parens(@block)
@@ -382,6 +399,60 @@ def include_includes(lines, current_file = @input, depth = 0)
       [line]
     end
   end.flatten(1)
+end
+
+```
+
+### Evaling the Extensions
+
+The extensions are executed within the following context.  This context is also
+used to evaluate conditionals.
+
+###### Code Block: Context Class
+
+``` ruby
+class Context
+  attr_accessor :filters
+
+  def get_binding
+    binding
+  end
+
+  def parse_hook(main_block, blocks)
+    [main_block, blocks]
+  end
+end
+
+```
+
+In order to process the extensions we must go through the lines, seperating out any extension blocks.  
+
+###### Code Block: Eval Extensions
+
+``` ruby
+def eval_and_remove_extensions(lines)
+  extension_expression = ⦅extension_expression⦆
+  extension_exit_expression = /```/
+  in_extension_block = false
+
+  extension_lines, other_lines = lines.partition do |line|
+    unless in_extension_block
+      in_extension_block = line =~ extension_expression
+    else
+      in_extension_block = !(line =~ extension_exit_expression)
+      true
+    end
+  end
+
+  e = extension_lines.slice_before do |line|
+    extension_expression =~ line
+  end.map do |block|
+    block[1..-2].join
+  end.each do |block|
+    @extension_context.get_binding.eval(block)
+  end
+
+  other_lines
 end
 
 ```
@@ -609,7 +680,7 @@ Filters are applied by the following method:
 ``` ruby
 def apply_filters(strings, filters)
   filters.map do |filter_name|
-    Tangler.filters[filter_name]
+    filters_map[filter_name]
   end.inject(strings) do |strings, filter|
     filter.filter(strings)
   end
@@ -704,6 +775,7 @@ Then we need the tests we are doing.  The intentionally empty block is included 
 ⦅test_filters⦆
 ⦅test_inclusion⦆
 ⦅intentionally_empty_block⦆
+⦅test_extensions⦆
 ```
 
 ### Testing: Macros
@@ -784,6 +856,16 @@ report_self_test_failure("Add comma isn't adding commas") unless items == ["item
 ⦅included_block⦆
 report_self_test_failure("included replacements should replace blocks") unless included_string == "I came from lmt_include.lmd"
 ```
+
+### Testing: Extensions
+
+###### Code Block: Test Extensions
+
+``` ruby
+⦅from_extension⦆
+report_self_test_failure("extension hook should be able to add blocks") unless from_extension
+```
+
 
 ### Regressions
 

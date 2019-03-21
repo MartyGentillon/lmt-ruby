@@ -261,6 +261,7 @@ The main body will first test itself then, invoke the library component, which i
 ###### Code Block: Main Body
 
 ``` ruby
+@dev = options[:dev]
 self_test()
 tangler = Tangle::Tangler.new(options[:file])
 tangler.tangle()

@@ -16,6 +16,7 @@ class Tangle
   main do
     check_arguments()
     begin
+      @dev = options[:dev]
       self_test()
       tangler = Tangle::Tangler.new(options[:file])
       tangler.tangle()

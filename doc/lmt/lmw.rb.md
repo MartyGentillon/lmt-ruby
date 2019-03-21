@@ -298,6 +298,7 @@ We will match the lines against the expressions and, when a match occurs, we wil
 def substitute_directives_and_headers(lines)
   include_expression = ⦅include_expression⦆
   code_block_expression = ⦅code_block_expression⦆
+  extension_block_expression = ⦅extension_expression⦆
   in_block = false
   block_name = ""
   lines.map do |line|
@@ -319,28 +320,34 @@ def substitute_directives_and_headers(lines)
 end
 ```
 
-#### The header for code blocks
+#### The Header for Code Blocks
 
 Code blocks need to be headed appropriately as markdown parsing eats the code block name.  Because of this we put it in a `h6` header.  When the block is repeated, we add a `(part n)` to the end.  We also should be adding links for the next and last version of this header.
 
 ###### Code Block: Make Code Block Header
 
 ``` ruby
-white_space, language, replacement_mark, name =
-  code_block_expression.match(line)[1..-1]
-human_name = name.gsub(/[-_]/, ' ').split(' ').map(&:capitalize).join(' ')
-replacing = if replacement_mark == "="
-      " Replacing"
-    else
-      ""
-    end
-header = if name != ""
-  "#######{replacing} Code Block: #{human_name}\n\n"
+if line =~ extension_block_expression
+  white_space = extension_block_expression.match(line)[1]
+  header = "###### Execute Extension Block\n\n"
+  [header, "#{white_space}``` ruby\n"]
 else
-  "#######{replacing} Output Block\n\n"
+  white_space, language, replacement_mark, name =
+    code_block_expression.match(line)[1..-1]
+  human_name = name.gsub(/[-_]/, ' ').split(' ').map(&:capitalize).join(' ')
+  replacing = if replacement_mark == "="
+        " Replacing"
+      else
+        ""
+      end
+  header = if name != ""
+    "#######{replacing} Code Block: #{human_name}\n\n"
+  else
+    "#######{replacing} Output Block\n\n"
+  end
+  [header,
+    "#{white_space}``` #{language}\n"]
 end
-[header,
-  "#{white_space}``` #{language}\n"]
 ```
 
 ### Replacing the Markdown Links

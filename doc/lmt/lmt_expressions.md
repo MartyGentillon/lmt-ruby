@@ -19,15 +19,17 @@ This expression is intended to note when whe enter or leave a code block.  It de
 ###### Code Block: Code Block Expression
 
 ``` ruby
-/^([s]*)``` ?([\w]*) ?(=?)([-\w]*)?/
+/^(\s*)``` ?([\w]*) ?(=?)([-\w]*)?/
 ```
 
 ## The Extension Expression
 
+This expression identifies blocks of code which are to be executed.  The first group identifies white space at the beginning of the line.
+
 ###### Code Block: Extension Expression
 
 ``` ruby
-/^([s]*)``` ruby !/
+/^(\s*)``` ruby !/
 ```
 
 ## The Macro Substitution Expression

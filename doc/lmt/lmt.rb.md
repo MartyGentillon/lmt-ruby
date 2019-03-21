@@ -163,7 +163,7 @@ In order to extend the tangler, it must be possible to mark a block for evaluati
 
 However, after blocks have been parsed, the map of blocks will be passed to the `parse_hook` method which an extension may define.  It will be passed a two arguments.  The first is an array with the lines of the main block, the second is a map of block name to line arrays.  It is expected to return the same datastructure in a two value array.  An example parse hook which adds a block to the list of know blocks follows:
 
-###### Output Block
+###### Execute Extension Block
 
 ``` ruby
 def parse_hook(main_block, blocks)

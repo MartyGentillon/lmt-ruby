@@ -161,7 +161,7 @@ class Tangle
     end
     
     def eval_and_remove_extensions(lines)
-      extension_expression = /^([s]*)``` ruby !/
+      extension_expression = /^(\s*)``` ruby !/
       extension_exit_expression = /```/
       in_extension_block = false
     
@@ -186,7 +186,7 @@ class Tangle
     end
     
     def parse_blocks(lines)
-      code_block_exp = /^([s]*)``` ?([\w]*) ?(=?)([-\w]*)?/
+      code_block_exp = /^(\s*)``` ?([\w]*) ?(=?)([-\w]*)?/
       in_block = false
       blocks = lines.find_all do |line|
         in_block = !in_block if line =~ code_block_exp

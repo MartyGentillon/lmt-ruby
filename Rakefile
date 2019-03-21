@@ -57,7 +57,7 @@ lmd_files.zip(outputs, docs).each do |lmd_file, output, doc|
   file output => [output_dir, lmd_file] do
     sh "ruby bin/lmt --file #{lmd_file} --output #{output} --dev"
   end
-  file doc => [doc_dir, lmd_file] do
+  file doc => ["lib/lmt/lmw.rb", doc_dir, lmd_file] do
     sh "ruby bin/lmw --file #{lmd_file} --output #{doc}"
   end
 end

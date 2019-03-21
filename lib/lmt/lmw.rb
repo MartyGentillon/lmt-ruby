@@ -123,6 +123,7 @@ class Lmw
     def substitute_directives_and_headers(lines)
       include_expression = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
       code_block_expression = /^([s]*)``` ?([\w]*) ?(=?)([-\w]*)?/
+      extension_block_expression = /^([s]*)``` ruby !/
       in_block = false
       block_name = ""
       lines.map do |line|
@@ -133,21 +134,27 @@ class Lmw
         when code_block_expression
           in_block = !in_block
           if in_block
-            white_space, language, replacement_mark, name =
-              code_block_expression.match(line)[1..-1]
-            human_name = name.gsub(/[-_]/, ' ').split(' ').map(&:capitalize).join(' ')
-            replacing = if replacement_mark == "="
-                  " Replacing"
-                else
-                  ""
-                end
-            header = if name != ""
-              "#######{replacing} Code Block: #{human_name}\n\n"
+            if line =~ extension_block_expression
+              white_space = extension_block_expression.match(line)[1]
+              header = "###### Execute Extension Block\n\n"
+              [header, "#{white_space}``` ruby\n"]
             else
-              "#######{replacing} Output Block\n\n"
+              white_space, language, replacement_mark, name =
+                code_block_expression.match(line)[1..-1]
+              human_name = name.gsub(/[-_]/, ' ').split(' ').map(&:capitalize).join(' ')
+              replacing = if replacement_mark == "="
+                    " Replacing"
+                  else
+                    ""
+                  end
+              header = if name != ""
+                "#######{replacing} Code Block: #{human_name}\n\n"
+              else
+                "#######{replacing} Output Block\n\n"
+              end
+              [header,
+                "#{white_space}``` #{language}\n"]
             end
-            [header,
-              "#{white_space}``` #{language}\n"]
           else
             [line]
           end

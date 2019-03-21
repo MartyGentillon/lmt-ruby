@@ -375,7 +375,7 @@ end
 
 ```
 
-In order to process the extensions we must go through the lines, seperating out any extension blocks.  
+In order to process the extensions we must go through the lines, separating out any extension blocks.  We then execute them within the extension_context and return the non-extension lines.
 
 ``` ruby eval_extensions
 def eval_and_remove_extensions(lines)

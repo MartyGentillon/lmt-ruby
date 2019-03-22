@@ -25,13 +25,14 @@ In order to be useful for literate programming we need a few features:
 5. The ability to append to or replace code blocks
 6. The ability to include another file.
 7. The ability to extend the tangler with Ruby code from a block.
+8. Simple conditional logic to enable output only under certain circumstances
 
 There are also a few potentially useful features that are not implemented but might be in the future:
 
 1. The ability to write out other files.
 2. Source mapping
 3. Further source verification.  For instance, all instances of the same block should be in the same language.  Also, detect and prevent double inclusion.
-4. Simple variables and conditional logic to enable output only under certain circumstances
+4. include path semantics.
 
 ### Blocks
 
@@ -161,7 +162,7 @@ included_string = "I am in lmt.lmd"
 
 In order to extend the tangler, it must be possible to mark a block for evaluation.  To do so we will extend the mechanism to indicate replacement.  Let's use `!`.  A block simply named `!` will just be executed within a contained scope.  Within this scope, it will be possible to access the map of filters through the `@filters` variable.  All of these blocks are executed and removed from the stream before any further processing is done.
 
-However, after blocks have been parsed, the map of blocks will be passed to the `parse_hook` method which an extension may define.  It will be passed a two arguments.  The first is an array with the lines of the main block, the second is a map of block name to line arrays.  It is expected to return the same datastructure in a two value array.  An example parse hook which adds a block to the list of know blocks follows:
+However, after blocks have been parsed, the map of blocks will be passed to the `parse_hook` method which an extension may define.  It will be passed a two arguments.  The first is an array with the lines of the main block, the second is a map of block name to line arrays.  It is expected to return the same data structure in a two value array.  An example parse hook which adds a block to the list of know blocks follows:
 
 ###### Execute Extension Block
 
@@ -171,6 +172,50 @@ def parse_hook(main_block, blocks)
   [main_block, blocks]
 end
 ```
+
+### Conditional Output
+
+Under certain circumstances it is useful to have certain output only happen under certain circumstances.  For instance, a file prepared for Windows might have slightly different content than the same file prepared for Linux.  In order to enable this, a variable may be set within an extension block and then output may be enabled / disabled using directives based on them.
+
+###### Execute Extension Block
+
+``` ruby
+@a_variable = true
+@another_variable = false
+```
+
+We can then disable and enable output using the if, else, elsif, and end directives.  The if directive takes a line of ruby code, executes it.
+
+! if @a_variable
+
+Since a_variable is true, the next block will be processed.
+
+###### Code Block: Conditional Output
+
+``` ruby
+conditional_output_else = true
+conditional_output_elsif = true
+```
+
+! elsif @another_variable
+
+###### Code Block: Conditional Output
+
+``` ruby
+conditional_output_elsif = false
+```
+
+! else
+
+And the following block will have no effect.
+
+###### Code Block: Conditional Output
+
+``` ruby
+conditional_output_else = false
+```
+
+! end
 
 ### Self Test
 
@@ -308,7 +353,7 @@ class Tangler
   ⦅tangle⦆
   ⦅read_file⦆
   ⦅include_includes⦆
-  ⦅eval_extensions⦆
+  ⦅handle_extensions_and_conditionals⦆
   ⦅parse_blocks⦆
   ⦅expand_macros⦆
   ⦅apply_filters⦆
@@ -320,6 +365,8 @@ class Tangler
     @extension_context.filters
   end
   ⦅tangle_class_privates⦆
+
+  ⦅conditional_processor⦆
 end
 ```
 
@@ -343,13 +390,13 @@ end
 
 ### Tangle
 
-Now we have the basic tangle process wherein a file is read, includes are substituted, extensions processed, the blocks extracted, the extension hook called, macros expanded recursively, and escaped double parentheses unescaped.  If there is no default block, then there is no further work to be done.
+Now we have the basic tangle process wherein a file is read, includes are substituted, extensions and conditionals are processed, the blocks extracted, the extension hook called, macros expanded recursively, and escaped double parentheses unescaped.  If there is no default block, then there is no further work to be done.
 
 ###### Code Block: Tangle
 
 ``` ruby
 def tangle()
-  contents = eval_and_remove_extensions(
+  contents =  handle_extensions_and_conditionals(
       include_includes(read_file(@input)))
   @block, @blocks = @extension_context.parse_hook(*parse_blocks(contents))
   if @block
@@ -403,7 +450,7 @@ end
 
 ```
 
-### Evaling the Extensions
+### Evaling the Extensions and Processing the Conditionals
 
 The extensions are executed within the following context.  This context is also
 used to evaluate conditionals.
@@ -425,34 +472,96 @@ end
 
 ```
 
-In order to process the extensions we must go through the lines, separating out any extension blocks.  We then execute them within the extension_context and return the non-extension lines.
+Because conditional processing must occur concurrently with bock evaling, we have to build up each block and eval it the moment it is complete.  To do so, we find all the lines that are not in an extension block.  When we enter a new extension block, we clear the current extension block, and when we leave an extension block, we eval it.
 
-###### Code Block: Eval Extensions
+###### Code Block: Handle Extensions And Conditionals
 
 ``` ruby
-def eval_and_remove_extensions(lines)
+def handle_extensions_and_conditionals(lines)
   extension_expression = ⦅extension_expression⦆
+  condition_processor = ConditionalProcessor.new(@extension_context)
   extension_exit_expression = /```/
   in_extension_block = false
+  current_extension_block = []
 
-  extension_lines, other_lines = lines.partition do |line|
-    unless in_extension_block
-      in_extension_block = line =~ extension_expression
-    else
-      in_extension_block = !(line =~ extension_exit_expression)
-      true
-    end
-  end
+  other_lines = lines.lazy
+    .find_all do |line|
+      condition_processor.should_output(line)
+    end.find_all do |line|
+      unless in_extension_block
+        in_extension_block = line =~ extension_expression
+        if in_extension_block
+          current_extension_block = []
+        end
+        !in_extension_block
+      else
+        in_extension_block = !(line =~ extension_exit_expression)
+        if in_extension_block
+          current_extension_block << line
+        else
+          @extension_context.get_binding.eval(current_extension_block.join)
+        end
+        false
+      end
+    end.force
 
-  e = extension_lines.slice_before do |line|
-    extension_expression =~ line
-  end.map do |block|
-    block[1..-2].join
-  end.each do |block|
-    @extension_context.get_binding.eval(block)
-  end
+  condition_processor.check_block_balance()
 
   other_lines
+end
+
+```
+
+### Processing The Conditionals
+
+To process the conditionals, we need a stack.  Given that we are handling if, elsif, and else, we will need to track: 1) the type of statement (in case we want to add loops later), 2) the state before we encounter the if and, 3) if the else should be executed.  For if statements, we can store these in an array like `[type, prior_state, execute_else]`
+
+Since this process happens concurrently with evaling the included blocks, it's process is represented by a class.  Should_output is the inside of the filter statement which is used to filter the lines.
+
+###### Code Block: Conditional Processor
+
+``` ruby
+class ConditionalProcessor
+
+  def initialize(extension_context)
+    @if_expression = ⦅if_expression⦆
+    @elsif_expression = ⦅elsif_expression⦆
+    @else_expression = ⦅else_expression⦆
+    @end_expression = ⦅end_expression⦆
+    @output_enabled = true
+    @stack = []
+    @extension_context = extension_context
+  end
+
+  def should_output(line)
+    case line
+      when @if_expression
+        condition = $1
+        prior_state = @output_enabled
+        @output_enabled = !!@extension_context.get_binding.eval(condition)
+        @stack.push([:if, prior_state, !@output_enabled])
+      when @elsif_expression
+        throw "elsif statement missing if"  if @stack.empty?
+        condition = $1
+        type, prior_state, execute_else = @stack.pop()
+        @output_enabled = execute_else && !!@extension_context.get_binding.eval(condition)
+        @stack.push([type, prior_state, execute_else && !@output_enabled])
+      when @else_expression
+        throw "else statement missing if" if @stack.empty?
+        type, prior_state, execute_else = @stack.pop()
+        @output_enabled = execute_else
+        @stack.push([type, prior_state, execute_else])
+      when @end_expression
+        throw "end statement missing begin" if @stack.empty?
+        type, prior_state, execute_else = @stack.pop()
+        @output_enabled = prior_state
+    end
+    @output_enabled
+  end
+  
+  def check_block_balance
+    throw "unbalanced blocks" unless @stack.empty?
+  end
 end
 
 ```
@@ -776,6 +885,7 @@ Then we need the tests we are doing.  The intentionally empty block is included 
 ⦅test_inclusion⦆
 ⦅intentionally_empty_block⦆
 ⦅test_extensions⦆
+⦅test_conditional_output⦆
 ```
 
 ### Testing: Macros
@@ -866,6 +976,159 @@ report_self_test_failure("included replacements should replace blocks") unless i
 report_self_test_failure("extension hook should be able to add blocks") unless from_extension
 ```
 
+### Testing: Conditional Output
+
+In the description, the if statement was to be executed.
+
+###### Code Block: Test Conditional Output
+
+``` ruby
+⦅conditional_output⦆
+report_self_test_failure("conditional output elseif should not be output when elseif is false") unless conditional_output_elsif
+report_self_test_failure("conditional output else should not be output when if true") unless conditional_output_else
+```
+
+#### If and elsif
+
+Neither the elsif or elsif statement are output when if is true.
+
+###### Code Block: Test Conditional Output
+
+``` ruby
+⦅conditional_output_if_and_elsif⦆
+report_self_test_failure("conditional output elsif should not be output even if true when is also true") unless conditional_output_elsif
+report_self_test_failure("conditional output else should not be output when if is true (if and elseif)") unless conditional_output_else
+```
+
+###### Execute Extension Block
+
+``` ruby
+@a_variable = true
+@another_variable = true
+```
+
+! if @a_variable
+
+###### Code Block: Conditional Output If And Elsif
+
+``` ruby
+conditional_output_else = true
+conditional_output_elsif = true
+```
+
+! elsif @another_variable
+
+###### Code Block: Conditional Output If And Elsif
+
+``` ruby
+conditional_output_elsif = false
+```
+
+! else
+
+###### Code Block: Conditional Output If And Elsif
+
+``` ruby
+conditional_output_else = false
+```
+
+! end
+
+#### Elsif
+
+When the if is false but the elsif true, only the elsif is output.
+
+###### Code Block: Test Conditional Output
+
+``` ruby
+conditional_output_if = true
+⦅conditional_output_elsif⦆
+report_self_test_failure("conditional output if should not be output when false") unless conditional_output_if
+report_self_test_failure("conditional output elseif should be output when elseif is true") unless conditional_output_elsif
+report_self_test_failure("conditional output else should not be output when elseif is true") unless conditional_output_else
+```
+
+###### Execute Extension Block
+
+``` ruby
+@a_variable = false
+@another_variable = true
+```
+
+! if @a_variable
+
+###### Code Block: Conditional Output Elsif
+
+``` ruby
+conditional_output_if = false
+```
+
+! elsif @another_variable
+
+###### Code Block: Conditional Output Elsif
+
+``` ruby
+conditional_output_else = true
+conditional_output_elsif = true
+```
+
+! else
+
+###### Code Block: Conditional Output Elsif
+
+``` ruby
+conditional_output_else = false
+```
+
+! end
+
+#### Else
+
+The else is output when none of the if or elsif statements are true.
+
+###### Code Block: Test Conditional Output
+
+``` ruby
+conditional_output_if = true
+conditional_output_elsif = true
+⦅conditional_output_else⦆
+report_self_test_failure("conditional output if should not be output when false") unless conditional_output_if
+report_self_test_failure("conditional output elseif should not be output when elseif is false") unless conditional_output_elsif
+report_self_test_failure("conditional output else should be output when neither if nor elseif is true") unless conditional_output_else
+```
+
+###### Execute Extension Block
+
+``` ruby
+@a_variable = false
+@another_variable = false
+```
+
+! if @a_variable
+
+###### Code Block: Conditional Output Else
+
+``` ruby
+conditional_output_if = false
+```
+
+! elsif @another_variable
+
+###### Code Block: Conditional Output Else
+
+``` ruby
+conditional_output_elsif = false
+```
+
+! else
+
+###### Code Block: Conditional Output Else
+
+``` ruby
+conditional_output_else = true
+```
+
+! end
 
 ### Regressions
 

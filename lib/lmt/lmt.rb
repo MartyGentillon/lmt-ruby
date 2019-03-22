@@ -72,6 +72,26 @@ class Tangle
     from_extension = true
 
     report_self_test_failure("extension hook should be able to add blocks") unless from_extension
+    conditional_output_else = true
+    conditional_output_elsif = true
+    report_self_test_failure("conditional output elseif should not be output when elseif is false") unless conditional_output_elsif
+    report_self_test_failure("conditional output else should not be output when if true") unless conditional_output_else
+    conditional_output_else = true
+    conditional_output_elsif = true
+    report_self_test_failure("conditional output elsif should not be output even if true when is also true") unless conditional_output_elsif
+    report_self_test_failure("conditional output else should not be output when if is true (if and elseif)") unless conditional_output_else
+    conditional_output_if = true
+    conditional_output_else = true
+    conditional_output_elsif = true
+    report_self_test_failure("conditional output if should not be output when false") unless conditional_output_if
+    report_self_test_failure("conditional output elseif should be output when elseif is true") unless conditional_output_elsif
+    report_self_test_failure("conditional output else should not be output when elseif is true") unless conditional_output_else
+    conditional_output_if = true
+    conditional_output_elsif = true
+    conditional_output_else = true
+    report_self_test_failure("conditional output if should not be output when false") unless conditional_output_if
+    report_self_test_failure("conditional output elseif should not be output when elseif is false") unless conditional_output_elsif
+    report_self_test_failure("conditional output else should be output when neither if nor elseif is true") unless conditional_output_else
   end
 
   def self.report_self_test_failure(message)
@@ -130,7 +150,7 @@ class Tangle
     end
     
     def tangle()
-      contents = eval_and_remove_extensions(
+      contents =  handle_extensions_and_conditionals(
           include_includes(read_file(@input)))
       @block, @blocks = @extension_context.parse_hook(*parse_blocks(contents))
       if @block
@@ -160,27 +180,35 @@ class Tangle
       end.flatten(1)
     end
     
-    def eval_and_remove_extensions(lines)
+    def handle_extensions_and_conditionals(lines)
       extension_expression = /^(\s*)``` ruby !/
+      condition_processor = ConditionalProcessor.new(@extension_context)
       extension_exit_expression = /```/
       in_extension_block = false
+      current_extension_block = []
     
-      extension_lines, other_lines = lines.partition do |line|
-        unless in_extension_block
-          in_extension_block = line =~ extension_expression
-        else
-          in_extension_block = !(line =~ extension_exit_expression)
-          true
-        end
-      end
+      other_lines = lines.lazy
+        .find_all do |line|
+          condition_processor.should_output(line)
+        end.find_all do |line|
+          unless in_extension_block
+            in_extension_block = line =~ extension_expression
+            if in_extension_block
+              current_extension_block = []
+            end
+            !in_extension_block
+          else
+            in_extension_block = !(line =~ extension_exit_expression)
+            if in_extension_block
+              current_extension_block << line
+            else
+              @extension_context.get_binding.eval(current_extension_block.join)
+            end
+            false
+          end
+        end.force
     
-      e = extension_lines.slice_before do |line|
-        extension_expression =~ line
-      end.map do |block|
-        block[1..-2].join
-      end.each do |block|
-        @extension_context.get_binding.eval(block)
-      end
+      condition_processor.check_block_balance()
     
       other_lines
     end
@@ -298,6 +326,50 @@ class Tangle
             end
           end
     end
+  
+    class ConditionalProcessor
+    
+      def initialize(extension_context)
+        @if_expression = /^!\s+if\s+(.*)$/
+        @elsif_expression = /^!\s+elsif\s+(.*)$/
+        @else_expression = /^!\s+else/
+        @end_expression = /^!\s+end$/
+        @output_enabled = true
+        @stack = []
+        @extension_context = extension_context
+      end
+    
+      def should_output(line)
+        case line
+          when @if_expression
+            condition = $1
+            prior_state = @output_enabled
+            @output_enabled = !!@extension_context.get_binding.eval(condition)
+            @stack.push([:if, prior_state, !@output_enabled])
+          when @elsif_expression
+            throw "elsif statement missing if"  if @stack.empty?
+            condition = $1
+            type, prior_state, execute_else = @stack.pop()
+            @output_enabled = execute_else && !!@extension_context.get_binding.eval(condition)
+            @stack.push([type, prior_state, execute_else && !@output_enabled])
+          when @else_expression
+            throw "else statement missing if" if @stack.empty?
+            type, prior_state, execute_else = @stack.pop()
+            @output_enabled = execute_else
+            @stack.push([type, prior_state, execute_else])
+          when @end_expression
+            throw "end statement missing begin" if @stack.empty?
+            type, prior_state, execute_else = @stack.pop()
+            @output_enabled = prior_state
+        end
+        @output_enabled
+      end
+      
+      def check_block_balance
+        throw "unbalanced blocks" unless @stack.empty?
+      end
+    end
+    
   end
 
   class Context

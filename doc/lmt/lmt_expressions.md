@@ -12,6 +12,34 @@ The first regular expression handles the detection of include directives.  It re
 /^!\s+include\s+\[.*\]\((.*)\)\s*$/
 ```
 
+## The Block Expressions
+
+These regular expression recognize if, elseif, else, and end directives.  The first group contains the conditional for blocks that have a conditional..
+
+###### Code Block: If Expression
+
+``` ruby
+/^!\s+if\s+(.*)$/
+```
+
+###### Code Block: Else Expression
+
+``` ruby
+/^!\s+else/
+```
+
+###### Code Block: Elsif Expression
+
+``` ruby
+/^!\s+elsif\s+(.*)$/
+```
+
+###### Code Block: End Expression
+
+``` ruby
+/^!\s+end$/
+```
+
 ## The Code Block Expression
 
 This expression is intended to note when whe enter or leave a code block.  It detects markdown code fences and processes the special directives.  It has four groups.  The first identifies white space at the beginning of the line.  The second detects the language.  The third determines if this is a replacement.  The fourth is the name of the block (if applicable).

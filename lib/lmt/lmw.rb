@@ -97,7 +97,7 @@ class Lmw
     
     def find_blocks(lines)
       lines_with_includes = include_includes(lines)
-      code_block_exp = /^([s]*)``` ?([\w]*) ?(=?)([-\w]*)?/
+      code_block_exp = /^(\s*)``` ?([\w]*) ?(=?)([-\w]*)?/
       headers_and_footers = lines_with_includes.filter do |(line, source_file)|
         code_block_exp =~ line
       end
@@ -122,8 +122,8 @@ class Lmw
     end
     def substitute_directives_and_headers(lines)
       include_expression = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
-      code_block_expression = /^([s]*)``` ?([\w]*) ?(=?)([-\w]*)?/
-      extension_block_expression = /^([s]*)``` ruby !/
+      code_block_expression = /^(\s*)``` ?([\w]*) ?(=?)([-\w]*)?/
+      extension_block_expression = /^(\s*)``` ruby !/
       in_block = false
       block_name = ""
       lines.map do |line|

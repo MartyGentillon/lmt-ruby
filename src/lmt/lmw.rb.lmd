@@ -31,6 +31,7 @@ We need to know where to get the input from and where to send the output to.  Fo
 ``` ruby options
 on("--file FILE", "-f", "Required: input file")
 on("--output FILE", "-o", "Required: output file")
+on("--include-path DIRECTORY,DIRECTORY", "-i", Array, "Include path")
 on("--dev", "disables self test failure for development")
 ```
 
@@ -105,12 +106,13 @@ The main body will first test itself then, invoke the library component, which i
 
 ``` ruby main_body
 self_test()
-weave = Lmw::Weave.from_file(options[:file])
+include_path = (options[:"include-path"] or [])
+weave = Lmw::Weave.from_file(options[:file], include_path)
 weave.weave()
 weave.write(options[:output])
 ```
 
-Finally, we have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.
+We have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.
 
 ``` ruby includes
 require 'optparse'
@@ -118,6 +120,10 @@ require 'methadone'
 
 require 'pry'
 ```
+
+Finally, The include files are located in
+
+! include-path include
 
 There, now we are done with the boilerplate. On to:
 
@@ -137,13 +143,8 @@ class Weave
 
   private
   ⦅weave_class_privates⦆
+  ⦅resolve_include⦆
 end
-```
-
-There may be some private methods, we need a block for them.  They will be inserted where needed.
-
-``` ruby weave_class_privates
-⦅include_includes⦆
 ```
 
 ### Initializer
@@ -151,7 +152,8 @@ There may be some private methods, we need a block for them.  They will be inser
 The initializer takes the input file and sets up our state.  
 
 ``` ruby initializer
-def initialize(lines, file_name = "")
+def initialize(lines, file_name = "", include_path = [])
+  @include_path = include_path
   @file_name = file_name
   @lines = lines
   @weaved = false
@@ -167,9 +169,9 @@ For testing, we want to be able to create an instance with a hard coded set of l
 This is fairly self explanatory, though note, we are storing the file in memory as an array of lines.
 
 ``` ruby from_file
-def from_file(file)
+def from_file(file, include_path = [])
   File.open(file, 'r') do |f|
-    Weave.new(f.readlines, file)
+    Weave.new(f.readlines, file, include_path)
   end
 end
 
@@ -237,17 +239,26 @@ end
 
 This depends on the expression in [lmt_expressions][lmt_expressions.md#The-Include-Expression]
 
+To resolve include paths we need:
+
+! include [this](include/lmt_include_path.lmd)
+
 Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.  For each line, we also need to add the file that it came from.
 
-``` ruby include_includes
+``` ruby weave_class_privates
 def include_includes(lines, current_file = @file_name, current_path = '', depth = 0)
   raise "too many includes" if depth > 1000
   include_exp = ⦅include_expression⦆
+  include_path_exp = ⦅include_path_expression⦆
   lines.map do |line|
-    match = include_exp.match(line)
-    if match
-      file = File.dirname(current_file) + '/' + match[1]
-      path = File.dirname(current_path) + '/' + match[1]
+    include_path_match = include_path_exp.match(line)
+    include_match = include_exp.match(line)
+    if include_path_match
+      path = resolve_include(include_path_match[1], current_file)[0]
+      @include_path << path
+      [[line,current_path]]
+    elsif include_match
+      file, path = resolve_include(include_match[1], current_file)
       new_lines = File.open(file, 'r') {|f| f.readlines}
       include_includes(new_lines, file, path, depth + 1)
     else
@@ -275,7 +286,8 @@ def substitute_directives_and_headers(lines)
     case line
     when include_expression
       include_file = $1
-      ["**See include:** [#{include_file}](include_file)\n"]
+      include_path = resolve_include(include_file, @file_name)[1]
+      ["**See include:** [included file](#{include_path.gsub(/\.lmd/, ".md")})\n"]
     when code_block_expression
       in_block = !in_block
       if in_block

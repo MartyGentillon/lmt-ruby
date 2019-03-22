@@ -5,6 +5,7 @@ require 'optparse'
 require 'methadone'
 
 require 'pry'
+require 'pathname'
 
 module Lmt
 
@@ -18,7 +19,8 @@ class Lmw
     check_arguments()
     begin
       self_test()
-      weave = Lmw::Weave.from_file(options[:file])
+      include_path = (options[:"include-path"] or [])
+      weave = Lmw::Weave.from_file(options[:file], include_path)
       weave.weave()
       weave.write(options[:output])
     rescue Exception => e
@@ -50,15 +52,16 @@ class Lmw
 
   class Weave
     class << self
-      def from_file(file)
+      def from_file(file, include_path = [])
         File.open(file, 'r') do |f|
-          Weave.new(f.readlines, file)
+          Weave.new(f.readlines, file, include_path)
         end
       end
       
     end
   
-    def initialize(lines, file_name = "")
+    def initialize(lines, file_name = "", include_path = [])
+      @include_path = include_path
       @file_name = file_name
       @lines = lines
       @weaved = false
@@ -79,22 +82,6 @@ class Lmw
     
   
     private
-    def include_includes(lines, current_file = @file_name, current_path = '', depth = 0)
-      raise "too many includes" if depth > 1000
-      include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
-      lines.map do |line|
-        match = include_exp.match(line)
-        if match
-          file = File.dirname(current_file) + '/' + match[1]
-          path = File.dirname(current_path) + '/' + match[1]
-          new_lines = File.open(file, 'r') {|f| f.readlines}
-          include_includes(new_lines, file, path, depth + 1)
-        else
-          [[line, current_path]]
-        end
-      end.flatten(1)
-    end
-    
     def find_blocks(lines)
       lines_with_includes = include_includes(lines)
       code_block_exp = /^(\s*)``` ?([\w]*) ?(=?)([-\w]*)?/
@@ -120,6 +107,27 @@ class Lmw
             {:count => count, :block_locations => block_locations}
           end
     end
+    def include_includes(lines, current_file = @file_name, current_path = '', depth = 0)
+      raise "too many includes" if depth > 1000
+      include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
+      include_path_exp = /^!\s+include-path\s+(.*)\s*$/
+      lines.map do |line|
+        include_path_match = include_path_exp.match(line)
+        include_match = include_exp.match(line)
+        if include_path_match
+          path = resolve_include(include_path_match[1], current_file)[0]
+          @include_path << path
+          [[line,current_path]]
+        elsif include_match
+          file, path = resolve_include(include_match[1], current_file)
+          new_lines = File.open(file, 'r') {|f| f.readlines}
+          include_includes(new_lines, file, path, depth + 1)
+        else
+          [[line, current_path]]
+        end
+      end.flatten(1)
+    end
+    
     def substitute_directives_and_headers(lines)
       include_expression = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
       code_block_expression = /^(\s*)``` ?([\w]*) ?(=?)([-\w]*)?/
@@ -130,7 +138,8 @@ class Lmw
         case line
         when include_expression
           include_file = $1
-          ["**See include:** [#{include_file}](include_file)\n"]
+          include_path = resolve_include(include_file, @file_name)[1]
+          ["**See include:** [included file](#{include_path.gsub(/\.lmd/, ".md")})\n"]
         when code_block_expression
           in_block = !in_block
           if in_block
@@ -166,6 +175,20 @@ class Lmw
     def replace_markdown_links(line)
       line
     end
+    def resolve_include(file, current_file)
+      include_file_loc = File.join(File.dirname(current_file), file)
+      if File.exist?(include_file_loc)
+        return [include_file_loc, file]
+      end
+      @include_path.each do |include_dir|
+        include_file_loc = File.join(include_dir, file)
+        if File.exist? (include_file_loc)
+          relative_path = Pathname.new(include_file_loc).relative_path_from(File.dirname(current_file)).to_s
+          return [include_file_loc, relative_path]
+        end
+      end
+      throw "include file: #{file} not found from #{current_file} or in #{@include_path}"
+    end
   end
 
   def self.required(*options)
@@ -184,6 +207,7 @@ class Lmw
   description "A literate Markdown weave tool written in Ruby."
   on("--file FILE", "-f", "Required: input file")
   on("--output FILE", "-o", "Required: output file")
+  on("--include-path DIRECTORY,DIRECTORY", "-i", Array, "Include path")
   on("--dev", "disables self test failure for development")
   required(:file, :output)
 

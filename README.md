@@ -29,13 +29,13 @@ Or install it yourself as:
 The tangle program takes input files and produces tangled output files.  It is used as follows:
 
 ``` bash
-lmt --file {input file} --output {tangled destination}
+lmt --file {input file} --output {tangled destination} --include-path {comma separated list of include paths}
 ```
 
 The weave program is similar but produces weaved output files.  It does not recurse down include statements, and so will need to be run independently for each included file.  An example usage:
 
 ``` bash
-lmw --file {input file} --output [weaved destination]
+lmw --file {input file} --output [weaved destination] --include-path {comma separated list of include paths}
 ```
 
 ## Development
@@ -53,10 +53,10 @@ bundle exec ruby bin/lmt --file src/lmt/lmt.rb.lmd --output lib/lmt/lmt.rb
 To test the weave you can use the following command which will weave the weaver and write it to the doc directory.
 
 ``` bash
-bundle exec ruby bin/lmt --file src/lmt/lmt.rb.lmd --output lib/lmt/lmt.rb; bundle exec ruby bin/lmw --file src/lmt/lmw.rb.lmd --output doc/lmt/lmw.rb.md
+bundle exec ruby bin/lmt --file src/lmt/lmw.rb.lmd --output lib/lmt/lmw.rb; bundle exec ruby bin/lmw --file src/lmt/lmw.rb.lmd --output doc/lmt/lmw.rb.md
 ```
 
-Since this is a self-bootstraping program, it is both tested and built by running itself on itself.  This means that if you add a bug, it won't run.  To fix this, check out the most recent version of the output file out of git.
+Since this is a self-bootstraping program, it is both tested and built by running itself on itself.  This means that if you add a bug, it won't run.  To fix this, check out the most recent version of the output file out of git.  To avoid lost work, it is recommended you commit especially often.
 
 ``` bash
 git co -- src/lmt/lmt.rb

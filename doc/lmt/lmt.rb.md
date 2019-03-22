@@ -156,7 +156,7 @@ During tangle the link line will be replaced with the lines from the included fi
 included_string = "I am in lmt.lmd"
 ```
 
-**See include:** [lmt_include.lmd](include_file)
+**See include:** [included file](include/lmt_include.md)
 
 ### Extension
 
@@ -172,6 +172,14 @@ def parse_hook(main_block, blocks)
   [main_block, blocks]
 end
 ```
+
+### Include Path
+
+It is possible to add directories to the include path using the `! include-path` directive like so:
+
+! include-path include
+
+The contents of that directive will be added to the include path.
 
 ### Conditional Output
 
@@ -238,6 +246,7 @@ We need to know where to get the input from and where to send the output to.  Fo
 ``` ruby
 on("--file FILE", "-f", "Required: input file")
 on("--output FILE", "-o", "Required: output file")
+on("--include-path DIRECTORY,DIRECTORY", "-i", Array, "Include path")
 on("--dev", "disables self test failure for development")
 ```
 
@@ -324,7 +333,8 @@ The main body will first test itself then, invoke the library component, which i
 ``` ruby
 @dev = options[:dev]
 self_test()
-tangler = Tangle::Tangler.new(options[:file])
+include_path = (options[:"include-path"] or [])
+tangler = Tangle::Tangler.new(options[:file], include_path)
 tangler.tangle()
 tangler.write(options[:output])
 ```
@@ -366,6 +376,8 @@ class Tangler
   end
   ⦅tangle_class_privates⦆
 
+  ⦅resolve_include⦆
+
   ⦅conditional_processor⦆
 end
 ```
@@ -377,7 +389,8 @@ The initializer takes in the input file and sets up our state.  We are keeping t
 ###### Code Block: Initializer
 
 ``` ruby
-def initialize(input)
+def initialize(input, include_path = [])
+  @include_path = include_path
   @extension_context = Context.new()
   @extension_context.filters = ⦅filter_list⦆
   @input = input
@@ -427,9 +440,15 @@ end
 
 As our specification is a regular language (we do not support any kind of nesting), we will be using regular expressions to process it.  Those expressions are detailed in:
 
-**See include:** [lmt_expressions.lmd](include_file)
+**See include:** [included file](include/lmt_expressions.md)
+
+To resolve include paths we need:
+
+**See include:** [included file](include/lmt_include_path.md)
 
 Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.
+
+When we encounter an include-path directive, it needs to be added to the include path.
 
 ###### Code Block: Include Includes
 
@@ -437,10 +456,16 @@ Here we go through each line looking for an include statement.  When we find one
 def include_includes(lines, current_file = @input, depth = 0)
   raise "too many includes" if depth > 1000
   include_exp = ⦅include_expression⦆
+  include_path_exp = ⦅include_path_expression⦆
   lines.map do |line|
-    match = include_exp.match(line)
-    if match
-      file = File.dirname(current_file) + '/' + match[1]
+    include_path_match = include_path_exp.match(line)
+    include_match = include_exp.match(line)
+    if include_path_match
+      path = resolve_include(include_path_match[1], current_file)[0]
+      @include_path << path
+      [line]
+    elsif include_match
+      file = resolve_include(include_match[1], current_file)[0]
       include_includes(read_file(file), file, depth + 1)
     else
       [line]
@@ -864,7 +889,7 @@ end
 
 Option verification is described here:
 
-**See include:** [option_verification.lmd](include_file)
+**See include:** [included file](include/option_verification.md)
 
 ## Self Test, Details
 
@@ -872,7 +897,7 @@ So, now we need to go into details of our self test and also include regressions
 
 First, we need a method to report test failures:
 
-**See include:** [error_reporting.lmd](include_file)
+**See include:** [included file](include/error_reporting.md)
 
 Then we need the tests we are doing.  The intentionally empty block is included both at the beginning and end to make sure that we handled all the edge cases related to empty blocks appropriately.
 

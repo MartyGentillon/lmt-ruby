@@ -4,6 +4,7 @@
 require 'optparse'
 require 'methadone'
 require 'lmt/version'
+require 'pathname'
 
 module Lmt
 
@@ -18,7 +19,8 @@ class Tangle
     begin
       @dev = options[:dev]
       self_test()
-      tangler = Tangle::Tangler.new(options[:file])
+      include_path = (options[:"include-path"] or [])
+      tangler = Tangle::Tangler.new(options[:file], include_path)
       tangler.tangle()
       tangler.write(options[:output])
     rescue Exception => e
@@ -120,7 +122,8 @@ class Tangle
   end
 
   class Tangler
-    def initialize(input)
+    def initialize(input, include_path = [])
+      @include_path = include_path
       @extension_context = Context.new()
       @extension_context.filters = {
         'ruby_escape' => LineFilter.new do |line|
@@ -169,10 +172,16 @@ class Tangle
     def include_includes(lines, current_file = @input, depth = 0)
       raise "too many includes" if depth > 1000
       include_exp = /^!\s+include\s+\[.*\]\((.*)\)\s*$/
+      include_path_exp = /^!\s+include-path\s+(.*)\s*$/
       lines.map do |line|
-        match = include_exp.match(line)
-        if match
-          file = File.dirname(current_file) + '/' + match[1]
+        include_path_match = include_path_exp.match(line)
+        include_match = include_exp.match(line)
+        if include_path_match
+          path = resolve_include(include_path_match[1], current_file)[0]
+          @include_path << path
+          [line]
+        elsif include_match
+          file = resolve_include(include_match[1], current_file)[0]
           include_includes(read_file(file), file, depth + 1)
         else
           [line]
@@ -327,6 +336,21 @@ class Tangle
           end
     end
   
+    def resolve_include(file, current_file)
+      include_file_loc = File.join(File.dirname(current_file), file)
+      if File.exist?(include_file_loc)
+        return [include_file_loc, file]
+      end
+      @include_path.each do |include_dir|
+        include_file_loc = File.join(include_dir, file)
+        if File.exist? (include_file_loc)
+          relative_path = Pathname.new(include_file_loc).relative_path_from(File.dirname(current_file)).to_s
+          return [include_file_loc, relative_path]
+        end
+      end
+      throw "include file: #{file} not found from #{current_file} or in #{@include_path}"
+    end
+  
     class ConditionalProcessor
     
       def initialize(extension_context)
@@ -401,6 +425,7 @@ class Tangle
   description "A literate Markdown tangle tool written in Ruby."
   on("--file FILE", "-f", "Required: input file")
   on("--output FILE", "-o", "Required: output file")
+  on("--include-path DIRECTORY,DIRECTORY", "-i", Array, "Include path")
   on("--dev", "disables self test failure for development")
   required(:file, :output)
 

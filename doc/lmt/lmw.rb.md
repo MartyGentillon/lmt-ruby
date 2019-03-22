@@ -35,6 +35,7 @@ We need to know where to get the input from and where to send the output to.  Fo
 ``` ruby
 on("--file FILE", "-f", "Required: input file")
 on("--output FILE", "-o", "Required: output file")
+on("--include-path DIRECTORY,DIRECTORY", "-i", Array, "Include path")
 on("--dev", "disables self test failure for development")
 ```
 
@@ -115,12 +116,13 @@ The main body will first test itself then, invoke the library component, which i
 
 ``` ruby
 self_test()
-weave = Lmw::Weave.from_file(options[:file])
+include_path = (options[:"include-path"] or [])
+weave = Lmw::Weave.from_file(options[:file], include_path)
 weave.weave()
 weave.write(options[:output])
 ```
 
-Finally, we have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.
+We have the dependencies.  Optparse and methadone are used for cli argument handling and other niceties.
 
 ###### Code Block: Includes
 
@@ -130,6 +132,10 @@ require 'methadone'
 
 require 'pry'
 ```
+
+Finally, The include files are located in
+
+! include-path include
 
 There, now we are done with the boilerplate. On to:
 
@@ -151,15 +157,8 @@ class Weave
 
   private
   ⦅weave_class_privates⦆
+  ⦅resolve_include⦆
 end
-```
-
-There may be some private methods, we need a block for them.  They will be inserted where needed.
-
-###### Code Block: Weave Class Privates
-
-``` ruby
-⦅include_includes⦆
 ```
 
 ### Initializer
@@ -169,7 +168,8 @@ The initializer takes the input file and sets up our state.
 ###### Code Block: Initializer
 
 ``` ruby
-def initialize(lines, file_name = "")
+def initialize(lines, file_name = "", include_path = [])
+  @include_path = include_path
   @file_name = file_name
   @lines = lines
   @weaved = false
@@ -187,9 +187,9 @@ This is fairly self explanatory, though note, we are storing the file in memory 
 ###### Code Block: From File
 
 ``` ruby
-def from_file(file)
+def from_file(file, include_path = [])
   File.open(file, 'r') do |f|
-    Weave.new(f.readlines, file)
+    Weave.new(f.readlines, file, include_path)
   end
 end
 
@@ -216,7 +216,7 @@ end
 
 In order to find the blocks we will need the regular expressions defined in:
 
-**See include:** [lmt_expressions.lmd](include_file)
+**See include:** [included file](include/lmt_expressions.md)
 
 First, we get the lines from includes.  then we filter the lines for only the headers and footers and check for unmatched headers and footers.
 
@@ -263,19 +263,28 @@ end
 
 This depends on the expression in [lmt_expressions][lmt_expressions.md#The-Include-Expression]
 
+To resolve include paths we need:
+
+**See include:** [included file](include/lmt_include_path.md)
+
 Here we go through each line looking for an include statement.  When we find one, we replace it with the lines from that file.  Those lines will, of course, need to have includes processed as well.  For each line, we also need to add the file that it came from.
 
-###### Code Block: Include Includes
+###### Code Block: Weave Class Privates
 
 ``` ruby
 def include_includes(lines, current_file = @file_name, current_path = '', depth = 0)
   raise "too many includes" if depth > 1000
   include_exp = ⦅include_expression⦆
+  include_path_exp = ⦅include_path_expression⦆
   lines.map do |line|
-    match = include_exp.match(line)
-    if match
-      file = File.dirname(current_file) + '/' + match[1]
-      path = File.dirname(current_path) + '/' + match[1]
+    include_path_match = include_path_exp.match(line)
+    include_match = include_exp.match(line)
+    if include_path_match
+      path = resolve_include(include_path_match[1], current_file)[0]
+      @include_path << path
+      [[line,current_path]]
+    elsif include_match
+      file, path = resolve_include(include_match[1], current_file)
       new_lines = File.open(file, 'r') {|f| f.readlines}
       include_includes(new_lines, file, path, depth + 1)
     else
@@ -305,7 +314,8 @@ def substitute_directives_and_headers(lines)
     case line
     when include_expression
       include_file = $1
-      ["**See include:** [#{include_file}](include_file)\n"]
+      include_path = resolve_include(include_file, @file_name)[1]
+      ["**See include:** [included file](#{include_path.gsub(/\.lmd/, ".md")})\n"]
     when code_block_expression
       in_block = !in_block
       if in_block
@@ -379,7 +389,7 @@ end
 
 Option verification is described here:
 
-**See include:** [option_verification.lmd](include_file)
+**See include:** [included file](include/option_verification.md)
 
 ## Testing
 
@@ -387,7 +397,7 @@ Of course, we will also need a testing procedure.  In this case, we will be pass
 
 First, we need a method to report test failures:
 
-**See include:** [error_reporting.lmd](include_file)
+**See include:** [included file](include/error_reporting.md)
 
 ###### Code Block: Self Test
 

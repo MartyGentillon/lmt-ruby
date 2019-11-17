@@ -4,9 +4,9 @@
 
 In literate programming, a program is contained within a prose essay describing the thinking which goes into the program.  The source code is then extracted from the essay using a program called tangle (this application).  The essay can also be formatted into a document for human consumption using a program called "weave".
 
-For a more detailed description and example, see the tangle program in [src/lmt.lmd](./src/lmt.lmd) and the weave program in [src/lmw.lmd](./src/lmw.lmd).
+For a more detailed description and example, see the tangle program in [src/lmt/lmt.rb.lmd](./src/lmt/lmt.rb.lmd) and the weave program in [src/lmt/lmw.rb.lmd](./src/lmt/lmw.rb.lmd).
 
-The weaved output may be found in [doc/lmt.md](./doc/lmt.md) and [doc/lmw.md](./doc/lmw.md)
+The weaved output may be found in [doc/lmt/lmt.rb.md](./doc/lmt/lmt.rb.md) and [doc/lmt/lmw.rb.md](./doc/lmt/lmw.rb.md)
 
 ## Installation
 

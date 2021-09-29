@@ -3,7 +3,7 @@
 
 require 'optparse'
 require 'methadone'
-
+require 'lmt/version'
 require 'pry'
 require 'pathname'
 

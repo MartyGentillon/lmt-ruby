@@ -15,19 +15,20 @@ GEM
     pry (0.11.3)
       coderay (~> 1.1.0)
       method_source (~> 0.9.0)
-    rake (10.5.0)
+    rake (13.0.6)
     rdoc (6.0.3)
     test-unit (3.2.7)
       power_assert
 
 PLATFORMS
+  ruby
   x64-mingw32
 
 DEPENDENCIES
   bundler (~> 1.16)
   lmt!
   pry
-  rake (~> 10.0)
+  rake (~> 13.0)
   rdoc
   test-unit
 

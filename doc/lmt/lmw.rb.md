@@ -129,7 +129,7 @@ We have the dependencies.  Optparse and methadone are used for cli argument hand
 ``` ruby
 require 'optparse'
 require 'methadone'
-
+require 'lmt/version'
 require 'pry'
 ```
 
